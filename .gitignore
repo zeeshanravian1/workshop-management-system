@@ -171,3 +171,9 @@ cython_debug/
 
 ### Visual Studio Code
 .vscode
+
+# Alembic Migration
+alembic/versions/*.py
+
+# SQLite database files
+*.db
