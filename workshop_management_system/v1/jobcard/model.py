@@ -26,6 +26,13 @@ class JobCardTable(BaseTable):
     supervisor_id: Mapped[int] = mapped_column(ForeignKey("employee.id"))
     mechanic_id: Mapped[int] = mapped_column(ForeignKey("employee.id"))
 
+    nhil: MappedColumn[Any] = mapped_column(Numeric(5, 2), default=2.5)
+    getfund: MappedColumn[Any] = mapped_column(Numeric(5, 2), default=2.5)
+    covid_levy: MappedColumn[Any] = mapped_column(Numeric(5, 2), default=1.0)
+    total_levy: MappedColumn[Any] = mapped_column(Numeric(10, 2))
+    vat: MappedColumn[Any] = mapped_column(Numeric(5, 2), default=15.0)
+    total_inclusive_tax: MappedColumn[Any] = mapped_column(Numeric(10, 2))
+
     customer = relationship("CustomerTable", back_populates="job_cards")
     vehicle = relationship("VehicleTable", back_populates="job_cards")
     supervisor = relationship(
