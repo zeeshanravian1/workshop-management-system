@@ -8,8 +8,8 @@ Description:
 from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from workshop_management_system.customer.model import CustomerTable
 from workshop_management_system.database.connection import BaseTable
+from workshop_management_system.v1.customer.model import CustomerTable
 
 
 class ComplaintTable(BaseTable):

@@ -6,9 +6,11 @@ Description:
 """
 
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import DateTime, Decimal, ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm.properties import MappedColumn
 
 from workshop_management_system.database.connection import BaseTable
 
@@ -20,7 +22,7 @@ class JobCardTable(BaseTable):
     vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicle.id"))
     service_date: Mapped[datetime] = mapped_column(DateTime)
     status: Mapped[str] = mapped_column(String(50))
-    total_amount: Mapped[Decimal] = mapped_column(Decimal(10, 2))
+    total_amount: MappedColumn[Any] = mapped_column(Numeric(10, 2))
     supervisor_id: Mapped[int] = mapped_column(ForeignKey("employee.id"))
     mechanic_id: Mapped[int] = mapped_column(ForeignKey("employee.id"))
 

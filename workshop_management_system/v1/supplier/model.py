@@ -8,7 +8,7 @@ from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from workshop_management_system.database.connection import BaseTable
-from workshop_management_system.inventory.model import InventoryTable
+from workshop_management_system.v1.inventory.model import InventoryTable
 
 
 class SupplierTable(BaseTable):

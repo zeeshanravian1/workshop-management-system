@@ -4,11 +4,14 @@ Description:
 - This module contains model for service table.
 """
 
-from sqlalchemy import Decimal, ForeignKey, String, Text
+from typing import Any
+
+from sqlalchemy import ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm.properties import MappedColumn
 
 from workshop_management_system.database.connection import BaseTable
-from workshop_management_system.jobcard.model import JobCardTable
+from workshop_management_system.v1.jobcard.model import JobCardTable
 
 
 class ServiceTable(BaseTable):
@@ -17,5 +20,5 @@ class ServiceTable(BaseTable):
     job_card_id: Mapped[int] = mapped_column(ForeignKey("jobcard.id"))
     service_type: Mapped[str] = mapped_column(String(100))
     description: Mapped[str] = mapped_column(Text)
-    cost: Mapped[Decimal] = mapped_column(Decimal(10, 2))
+    cost: MappedColumn[Any] = mapped_column(Numeric(10, 2))
     job_card: Mapped["JobCardTable"] = relationship(back_populates="services")
