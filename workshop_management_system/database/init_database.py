@@ -16,8 +16,20 @@ from workshop_management_system.core.config import (
     SUPERUSER_PASSWORD,
     SUPERUSER_USERNAME,
 )
-from workshop_management_system.user.model import UserTable
-
+from workshop_management_system.v1.employee.model import EmployeeTable
+from workshop_management_system.v1.complaint.model import ComplaintTable
+from workshop_management_system.v1.customer.model import CustomerTable
+from workshop_management_system.v1.digital_signature.model import DigitalSignatureTable
+from workshop_management_system.v1.estimate.model import EstimateTable
+from workshop_management_system.v1.inventory.model import InventoryTable
+from workshop_management_system.v1.jobcard.model import JobCardTable
+from workshop_management_system.v1.notification.model import NotificationTable
+from workshop_management_system.v1.payment.model import PaymentTable
+from workshop_management_system.v1.service.model import ServiceTable
+from workshop_management_system.v1.service_item.model import ServiceItemTable
+from workshop_management_system.v1.stock_transaction.model import StockTransactionTable
+from workshop_management_system.v1.supplier.model import SupplierTable
+from workshop_management_system.v1.vehicle.model import VehicleTable
 from .session import get_session
 
 db_create_logger: logging.Logger = logging.getLogger(name=__name__)
@@ -39,7 +51,7 @@ def create_super_admin() -> None:
     try:
         with get_session() as session:
             # Create super admin
-            super_user = UserTable(
+            super_user = EmployeeTable(
                 name=SUPERUSER_NAME,
                 username=SUPERUSER_USERNAME,
                 email=SUPERUSER_EMAIL,
