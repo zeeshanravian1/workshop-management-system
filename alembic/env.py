@@ -5,7 +5,9 @@ Description:
 
 """
 
+from importlib import import_module
 from logging.config import fileConfig
+from pathlib import Path
 
 from sqlalchemy import Engine, MetaData, engine_from_config, pool
 
@@ -17,13 +19,32 @@ from alembic.context import (
     is_offline_mode,
     run_migrations,
 )
-from workshop_management_system.database.connection import (
-    DATABASE_URL,
-    my_metadata,
-)
-from workshop_management_system.database.init_database import (
-    create_super_admin,
-)
+from workshop_management_system.core.config import DATABASE_URL
+from workshop_management_system.database.connection import my_metadata
+
+
+def load_all_models() -> None:
+    """Load SQLAlchemy models from project."""
+    base_path: Path = Path(__file__).resolve().parent.parent
+
+    # Discover all Python files in project
+    for path in base_path.rglob(pattern="*.py"):
+        if "site-packages" in str(object=path):
+            continue
+
+        try:
+            # Import module
+            import_module(
+                name=".".join(
+                    path.relative_to(base_path).with_suffix(suffix="").parts
+                )
+            )
+        except ModuleNotFoundError:
+            continue
+
+
+load_all_models()
+
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -92,9 +113,6 @@ def run_migrations_online() -> None:
 
         with begin_transaction():
             run_migrations()
-
-            # Create super admin
-            create_super_admin()
 
 
 if is_offline_mode():
