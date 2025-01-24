@@ -89,7 +89,13 @@ with get_session() as session:
     updated_customer: CustomerTable | None = customer_view.update(
         session,
         record_id=new_customer1.id,
-        record=CustomerTable(name="John Smith"),
+        record=CustomerTable(
+            name="John Smith",
+            mobile_number="1234567890",
+            vehicle_registration_number="ABC123",
+            email="john.smith@example.com",
+            address="123 Main Street, Springfield",
+        ),
     )
 
     if updated_customer:
@@ -104,7 +110,13 @@ with get_session() as session:
     updated_non_existent_customer: CustomerTable | None = customer_view.update(
         session,
         record_id=UUID("00000000-0000-0000-0000-000000000000"),
-        record=CustomerTable(name="John Smith"),
+        record=CustomerTable(
+            name="John Smith",
+            mobile_number="1234567890",
+            vehicle_registration_number="ABC123",
+            email="john.smith@example.com",
+            address="123 Main Street, Springfield",
+        ),
     )
 
     if updated_non_existent_customer:

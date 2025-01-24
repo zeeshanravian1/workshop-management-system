@@ -98,7 +98,7 @@ class BaseView(Generic[Model]):
         """
         db_session.execute(
             statement=update(table=self.model)
-            .where(self.model.id == record_id)
+            .where(self.model.id == record_id)  # type: ignore
             .values(record.model_dump(exclude_unset=True))
         )
         db_session.commit()

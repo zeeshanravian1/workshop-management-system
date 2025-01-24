@@ -19,4 +19,6 @@ class CustomerTable(BaseTable, table=True):
     email: str = Field(max_length=255)
     address: str
 
-    vehicles: list["VehicleTable"] = Relationship(back_populates="customer")
+    vehicles: list["VehicleTable"] = Relationship(  # type: ignore # noqa: F821
+        back_populates="customer"
+    )
