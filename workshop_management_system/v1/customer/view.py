@@ -6,10 +6,10 @@ Description:
 """
 
 from ..base.view import BaseView
-from .model import CustomerTable
+from .model import Customer
 
 
-class CustomerView(BaseView[CustomerTable]):
+class CustomerView(BaseView[Customer]):
     """Customer View Class.
 
     Description:

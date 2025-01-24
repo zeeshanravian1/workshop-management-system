@@ -9,11 +9,11 @@ from uuid import UUID
 
 from sqlmodel import Field, Relationship
 
-from workshop_management_system.database.connection import BaseTable
-from workshop_management_system.v1.customer.model import CustomerTable
+from workshop_management_system.database.connection import Base
+from workshop_management_system.v1.customer.model import Customer
 
 
-class VehicleTable(BaseTable, table=True):
+class Vehicle(Base, table=True):
     """Vehicle Table."""
 
     make: str = Field(max_length=100)
@@ -21,6 +21,6 @@ class VehicleTable(BaseTable, table=True):
     year: int
     chassis_number: str = Field(max_length=50)
     engine_number: str = Field(max_length=50)
-    customer_id: UUID = Field(foreign_key="customertable.id")
+    customer_id: UUID = Field(foreign_key="customer.id")
 
-    customer: CustomerTable = Relationship(back_populates="vehicles")
+    customer: Customer = Relationship(back_populates="vehicles")

@@ -7,10 +7,10 @@ Description:
 
 from sqlmodel import Field, Relationship
 
-from workshop_management_system.database.connection import BaseTable
+from workshop_management_system.database.connection import Base
 
 
-class CustomerTable(BaseTable, table=True):
+class Customer(Base, table=True):
     """Customer Table."""
 
     name: str = Field(max_length=2_55)
@@ -19,6 +19,6 @@ class CustomerTable(BaseTable, table=True):
     email: str = Field(max_length=255)
     address: str
 
-    vehicles: list["VehicleTable"] = Relationship(  # type: ignore # noqa: F821
+    vehicles: list["Vehicle"] = Relationship(  # type: ignore # noqa: F821
         back_populates="customer"
     )

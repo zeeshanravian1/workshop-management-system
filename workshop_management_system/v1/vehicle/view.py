@@ -6,10 +6,10 @@ Description:
 """
 
 from ..base.view import BaseView
-from .model import VehicleTable
+from .model import Vehicle
 
 
-class VehicleView(BaseView[VehicleTable]):
+class VehicleView(BaseView[Vehicle]):
     """Vehichle View Class.
 
     Description:

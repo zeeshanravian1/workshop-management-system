@@ -10,6 +10,7 @@ from logging.config import fileConfig
 from pathlib import Path
 
 from sqlalchemy import Engine, MetaData, engine_from_config, pool
+from sqlmodel import SQLModel
 
 from alembic.config import Config
 from alembic.context import (
@@ -20,7 +21,6 @@ from alembic.context import (
     run_migrations,
 )
 from workshop_management_system.core.config import DATABASE_URL
-from workshop_management_system.database.connection import BaseTable
 
 
 def load_all_models() -> None:
@@ -61,7 +61,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata: MetaData = BaseTable.metadata
+target_metadata: MetaData = SQLModel.metadata
 
 # other values from config, defined by needs of env.py,
 # can be acquired:

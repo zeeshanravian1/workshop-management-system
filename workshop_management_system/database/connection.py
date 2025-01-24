@@ -6,14 +6,11 @@ Description:
 """
 
 from datetime import datetime
-from typing import Any, Unpack
 from uuid import UUID, uuid4
 
-from pydantic import ConfigDict
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.sql.functions import now
 from sqlmodel import Field, MetaData, SQLModel
-from sqlmodel.main import SQLModelMetaclass
 
 from workshop_management_system.core.config import DATABASE_URL
 
@@ -21,32 +18,7 @@ engine: Engine = create_engine(url=DATABASE_URL)
 my_metadata: MetaData = MetaData()
 
 
-class CustomMetaclass(SQLModelMetaclass):
-    """Custom Metaclass for BaseTable."""
-
-    def __new__(
-        mcs,
-        name: str,
-        bases: tuple[type, ...],
-        namespace: dict[str, Any],
-        **kwargs: Unpack[ConfigDict],
-    ) -> Any:
-        """Create new instance of BaseTable."""
-        if bases and bases[0] is SQLModel and not kwargs.get("table"):
-            return super().__new__(mcs, name, bases, namespace, **kwargs)
-
-        if name != "BaseTable":
-            # Remove 'Table' and convert to snake case
-            namespace["__tablename__"] = "".join(
-                f"_{c.lower()}" if c.isupper() else c
-                for c in name.removesuffix("Table")
-            ).lstrip("_")
-
-        return super().__new__(mcs, name, bases, namespace, **kwargs)
-
-
-# class BaseTable(SQLModel, metaclass=CustomMetaclass):
-class BaseTable(SQLModel):
+class Base(SQLModel):
     """Base Table.
 
     Description:
@@ -60,7 +32,7 @@ class BaseTable(SQLModel):
         default=None, sa_column_kwargs={"onupdate": now()}
     )
 
-    class BaseConfig:
+    class BaseConfig:  # pylint: disable=too-few-public-methods
         """Configuration for BaseTable."""
 
         arbitrary_types_allowed = True

@@ -12,9 +12,9 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import update
 
-from workshop_management_system.database.connection import BaseTable
+from workshop_management_system.database.connection import Base
 
-Model = TypeVar("Model", bound=BaseTable)
+Model = TypeVar("Model", bound=Base)
 
 
 class BaseView(Generic[Model]):
