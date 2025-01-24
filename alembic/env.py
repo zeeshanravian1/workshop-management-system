@@ -28,7 +28,7 @@ def load_all_models() -> None:
     base_path: Path = Path(__file__).resolve().parent.parent
 
     # Discover all Python files in project
-    for path in base_path.rglob(pattern="*.py"):
+    for path in base_path.rglob(pattern="model.py"):
         if "site-packages" in str(object=path):
             continue
 
