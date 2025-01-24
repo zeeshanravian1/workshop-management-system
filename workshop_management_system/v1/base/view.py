@@ -1,15 +1,16 @@
 """Base View Module.
 
 Description:
-- This module contains the base view for all the views in the application.
+- This module contains base view for all views in application.
 
 """
 
 from collections.abc import Sequence
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
+from uuid import UUID
 
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import delete, update
+from sqlalchemy.sql import update
 
 from workshop_management_system.database.connection import BaseTable
 
@@ -25,7 +26,7 @@ class BaseView(Generic[Model]):
     """
 
     def __init__(self, model: type[Model]) -> None:
-        """Initialize the BaseView.
+        """Initialize BaseView.
 
         :Args:
         - `model` (Type[Model]): SQLAlchemy model class. **(Required)**
@@ -36,42 +37,41 @@ class BaseView(Generic[Model]):
         """
         self.model: type[Model] = model
 
-    def create(
-        self, db_session: Session, record_data: dict[str, Any]
-    ) -> Model:
-        """Create a new record in the database.
+    def create(self, db_session: Session, record: Model) -> Model:
+        """Create a new record in database.
 
         :Args:
         - `db_session` (Session): SQLAlchemy database session. **(Required)**
-        - `record_data` (dict[str, Any]): Data for the new record.
+        - `record` (Model): Model object to be added to database.
         **(Required)**
 
         :Returns:
-        - `Model`: The created record.
+        - `Model`: Created record.
 
         """
-        record: Model = self.model(**record_data)
         db_session.add(instance=record)
         db_session.commit()
         db_session.refresh(instance=record)
 
         return record
 
-    def read_by_id(self, db_session: Session, record_id: int) -> Model | None:
+    def read_by_id(
+        self, db_session: Session, record_id: UUID | int
+    ) -> Model | None:
         """Retrieve a record by its ID.
 
         :Args:
         - `db_session` (Session): SQLAlchemy database session. **(Required)**
-        - `record_id` (int): ID of the record. **(Required)**
+        - `record_id` (UUID | int): ID of record. **(Required)**
 
         :Returns:
-        - `Model | None`: The retrieved record, or None if not found.
+        - `Model | None`: Retrieved record, or None if not found.
 
         """
-        return db_session.query(self.model).get(ident=record_id)
+        return db_session.get(entity=self.model, ident=record_id)
 
     def read_all(self, db_session: Session) -> Sequence[Model]:
-        """Retrieve all records for the model.
+        """Retrieve all records for model.
 
         :Args:
         - `db_session` (Session): SQLAlchemy database session. **(Required)**
@@ -83,51 +83,47 @@ class BaseView(Generic[Model]):
         return db_session.query(self.model).all()
 
     def update(
-        self, db_session: Session, record_id: int, record_data: dict[str, Any]
+        self, db_session: Session, record_id: UUID | int, record: Model
     ) -> Model | None:
         """Update a record by its ID.
 
         :Args:
         - `db_session` (Session): SQLAlchemy database session. **(Required)**
-        - `record_id` (int): ID of the record to update. **(Required)**
-        - `record_data` (dict[str, Any]): Data to update. **(Required)**
+        - `record_id` (UUID | int): ID of record to update. **(Required)**
+        - `record` (Model): Model containing updated fields. **(Required)**
 
         :Returns:
-        - `Model | None`: The updated record, or None if not found.
+        - `Model | None`: Updated record, or None if not found.
 
         """
         db_session.execute(
             statement=update(table=self.model)
             .where(self.model.id == record_id)
-            .values(**record_data)
+            .values(record.model_dump(exclude_unset=True))
         )
         db_session.commit()
 
         return self.read_by_id(db_session=db_session, record_id=record_id)
 
-    def delete(self, db_session: Session, record_id: int) -> Model | None:
+    def delete(
+        self, db_session: Session, record_id: UUID | int
+    ) -> Model | None:
         """Delete a record by its ID.
 
         :Args:
         - `db_session` (Session): SQLAlchemy database session. **(Required)**
-        - `record_id` (int): ID of the record to delete. **(Required)**
+        - `record_id` (UUID | int): ID of record to delete. **(Required)**
 
         :Returns:
-        - `Model | None`: The deleted record, or None if not found.
+        - `Model | None`: Deleted record, or None if not found.
 
         """
-        record: Model | None = self.read_by_id(
-            db_session=db_session, record_id=record_id
+        record: Model | None = db_session.get(
+            entity=self.model, ident=record_id
         )
 
-        if not record:
-            return None
-
-        db_session.execute(
-            statement=delete(table=self.model).where(
-                self.model.id == record_id
-            )
-        )
-        db_session.commit()
+        if record:
+            db_session.delete(record)
+            db_session.commit()
 
         return record

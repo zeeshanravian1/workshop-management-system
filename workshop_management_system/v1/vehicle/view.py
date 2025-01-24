@@ -1,7 +1,7 @@
 """Vehicle View Module.
 
 Description:
-- This module contains the vehicle view for vehicle model.
+- This module contains vehicle view for vehicle model.
 
 """
 
@@ -13,6 +13,6 @@ class VehicleView(BaseView[VehicleTable]):
     """Vehichle View Class.
 
     Description:
-    - This class provides CRUD interface for the Vehicle model.
+    - This class provides CRUD interface for Vehicle model.
 
     """

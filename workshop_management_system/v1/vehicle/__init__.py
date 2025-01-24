@@ -1,7 +1,7 @@
 """Vehicle Package.
 
 Description:
-- This package contains the Vehicle modules for the workshop management
+- This package contains Vehicle modules for workshop management
 system.
 
 """

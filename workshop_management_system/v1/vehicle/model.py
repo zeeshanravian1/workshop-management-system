@@ -5,25 +5,22 @@ Description:
 
 """
 
-from sqlalchemy import ForeignKey, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from uuid import UUID
+
+from sqlmodel import Field, Relationship
 
 from workshop_management_system.database.connection import BaseTable
 from workshop_management_system.v1.customer.model import CustomerTable
 
 
-class VehicleTable(BaseTable):
+class VehicleTable(BaseTable, table=True):
     """Vehicle Table."""
 
-    make: Mapped[str] = mapped_column(String(100))
-    model: Mapped[str] = mapped_column(String(100))
-    year: Mapped[int] = mapped_column(Integer)
-    chassis_number: Mapped[str] = mapped_column(String(50))
-    engine_number: Mapped[str] = mapped_column(String(50))
+    make: str = Field(max_length=100)
+    model: str = Field(max_length=100)
+    year: int
+    chassis_number: str = Field(max_length=50)
+    engine_number: str = Field(max_length=50)
+    customer_id: UUID = Field(foreign_key="customertable.id")
 
-    customer_id: Mapped[int] = mapped_column(ForeignKey("customer.id"))
-
-    # Relationships
-    customer: Mapped[CustomerTable] = relationship(
-        back_populates="vehicles", lazy="subquery"
-    )
+    customer: CustomerTable = Relationship(back_populates="vehicles")

@@ -6,6 +6,7 @@ Description:
 """
 
 from collections.abc import Sequence
+from uuid import UUID
 
 from workshop_management_system.database.session import get_session
 from workshop_management_system.v1.customer.model import CustomerTable
@@ -22,28 +23,28 @@ with get_session() as session:
     # Create a customer
     new_customer1: CustomerTable = customer_view.create(
         session,
-        {
-            "name": "John Doe",
-            "mobile_number": "1234567890",
-            "vehicle_registration_number": "ABC123",
-            "email": "john.doe@example.com",
-            "address": "123 Main Street, Springfield",
-        },
+        CustomerTable(
+            name="John Doe",
+            mobile_number="1234567890",
+            vehicle_registration_number="ABC123",
+            email="john.doe@example.com",
+            address="123 Main Street, Springfield",
+        ),
     )
-    print(f"Customer Created: {new_customer1.to_dict()}")
+    print(f"Customer Created: {new_customer1.model_dump()}")
 
     # Create another customer
     new_customer2: CustomerTable = customer_view.create(
         session,
-        {
-            "name": "Jane Doe",
-            "mobile_number": "0987654321",
-            "vehicle_registration_number": "XYZ789",
-            "email": "jane.doe@example.com",
-            "address": "456 Elm Street, Springfield",
-        },
+        CustomerTable(
+            name="Jane Doe",
+            mobile_number="0987654321",
+            vehicle_registration_number="XYZ789",
+            email="jane.doe@example.com",
+            address="456 Elm Street, Springfield",
+        ),
     )
-    print(f"Customer Created: {new_customer2.to_dict()}")
+    print(f"Customer Created: {new_customer2.model_dump()}")
 
     print("******************************************************************")
 
@@ -54,7 +55,7 @@ with get_session() as session:
     )
 
     if customer:
-        print(f"Customer: {customer.to_dict()}")
+        print(f"Customer: {customer.model_dump()}")
     else:
         print("Customer not found.")
 
@@ -63,11 +64,12 @@ with get_session() as session:
     print("Get Non Existent Customer...")
     # Read non-existent customer
     non_existent_customer: CustomerTable | None = customer_view.read_by_id(
-        db_session=session, record_id=999
+        db_session=session,
+        record_id=UUID("00000000-0000-0000-0000-000000000000"),
     )
 
     if non_existent_customer:
-        print(f"Customer: {non_existent_customer.to_dict()}")
+        print(f"Customer: {non_existent_customer.model_dump()}")
     else:
         print("Customer not found.")
 
@@ -78,7 +80,7 @@ with get_session() as session:
     customers: Sequence[CustomerTable] = customer_view.read_all(session)
 
     for customer in customers:
-        print(f"Customer: {customer.to_dict()}")
+        print(f"Customer: {customer.model_dump()}")
 
     print("******************************************************************")
 
@@ -87,11 +89,11 @@ with get_session() as session:
     updated_customer: CustomerTable | None = customer_view.update(
         session,
         record_id=new_customer1.id,
-        record_data={"name": "John Smith"},
+        record=CustomerTable(name="John Smith"),
     )
 
     if updated_customer:
-        print(f"Customer Updated: {updated_customer.to_dict()}")
+        print(f"Customer Updated: {updated_customer.model_dump()}")
     else:
         print("Customer not found.")
 
@@ -101,26 +103,27 @@ with get_session() as session:
     # Update a non-existent customer
     updated_non_existent_customer: CustomerTable | None = customer_view.update(
         session,
-        record_id=999,
-        record_data={"name": "John Smith"},
+        record_id=UUID("00000000-0000-0000-0000-000000000000"),
+        record=CustomerTable(name="John Smith"),
     )
 
     if updated_non_existent_customer:
-        print(f"Customer Updated: {updated_non_existent_customer.to_dict()}")
+        print(
+            f"Customer Updated: {updated_non_existent_customer.model_dump()}"
+        )
     else:
         print("Customer not found.")
 
     print("******************************************************************")
 
     print("Deleting Customer...")
-
     # Delete a customer
     deleted_customer: CustomerTable | None = customer_view.delete(
         session, record_id=new_customer2.id
     )
 
     if deleted_customer:
-        print(f"Customer Deleted: {deleted_customer.to_dict()}")
+        print(f"Customer Deleted: {deleted_customer.model_dump()}")
     else:
         print("Customer not found.")
 
@@ -129,10 +132,15 @@ with get_session() as session:
     print("Deleting Non Existent Customer...")
     # Delete a non-existent customer
     deleted_non_existent_customer: CustomerTable | None = customer_view.delete(
-        session, record_id=999
+        session,
+        record_id=UUID("00000000-0000-0000-0000-000000000000"),
     )
 
     if deleted_non_existent_customer:
-        print(f"Customer Deleted: {deleted_non_existent_customer.to_dict()}")
+        print(
+            f"Customer Deleted: {deleted_non_existent_customer.model_dump()}"
+        )
     else:
         print("Customer not found.")
+
+    print("******************************************************************")

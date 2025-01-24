@@ -5,20 +5,18 @@ Description:
 
 """
 
-from sqlalchemy import String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlmodel import Field, Relationship
 
 from workshop_management_system.database.connection import BaseTable
 
 
-class CustomerTable(BaseTable):
+class CustomerTable(BaseTable, table=True):
     """Customer Table."""
 
-    name: Mapped[str] = mapped_column(String(2_55))
-    mobile_number: Mapped[str] = mapped_column(String(20))
-    vehicle_registration_number: Mapped[str] = mapped_column(String(50))
-    email: Mapped[str] = mapped_column(String(255))
-    address: Mapped[str] = mapped_column(Text)
+    name: str = Field(max_length=2_55)
+    mobile_number: str = Field(max_length=20)
+    vehicle_registration_number: str = Field(max_length=50)
+    email: str = Field(max_length=255)
+    address: str
 
-    # Relationships
-    vehicles = relationship("VehicleTable", back_populates="customer")
+    vehicles: list["VehicleTable"] = Relationship(back_populates="customer")

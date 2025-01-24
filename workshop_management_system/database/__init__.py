@@ -1,7 +1,7 @@
 """Database Package.
 
 Description:
-- This package contains the database modules for the workshop management
+- This package contains database modules for workshop management
 system.
 
 """

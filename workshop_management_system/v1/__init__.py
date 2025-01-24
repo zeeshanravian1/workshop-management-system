@@ -1,6 +1,6 @@
 """Workshop Apps Package.
 
 Description:
-- This package contains the apps for the workshop management system.
+- This package contains apps for workshop management system.
 
 """

@@ -5,15 +5,15 @@ Description:
 
 """
 
-from typing import Any
+from datetime import datetime
+from typing import Any, Unpack
+from uuid import UUID, uuid4
 
-from sqlalchemy import Engine, MetaData, create_engine
-from sqlalchemy.orm import (
-    DeclarativeBase,
-    Mapped,
-    declared_attr,
-    mapped_column,
-)
+from pydantic import ConfigDict
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.sql.functions import now
+from sqlmodel import Field, MetaData, SQLModel
+from sqlmodel.main import SQLModelMetaclass
 
 from workshop_management_system.core.config import DATABASE_URL
 
@@ -21,7 +21,32 @@ engine: Engine = create_engine(url=DATABASE_URL)
 my_metadata: MetaData = MetaData()
 
 
-class BaseTable(DeclarativeBase):
+class CustomMetaclass(SQLModelMetaclass):
+    """Custom Metaclass for BaseTable."""
+
+    def __new__(
+        mcs,
+        name: str,
+        bases: tuple[type, ...],
+        namespace: dict[str, Any],
+        **kwargs: Unpack[ConfigDict],
+    ) -> Any:
+        """Create new instance of BaseTable."""
+        if bases and bases[0] is SQLModel and not kwargs.get("table"):
+            return super().__new__(mcs, name, bases, namespace, **kwargs)
+
+        if name != "BaseTable":
+            # Remove 'Table' and convert to snake case
+            namespace["__tablename__"] = "".join(
+                f"_{c.lower()}" if c.isupper() else c
+                for c in name.removesuffix("Table")
+            ).lstrip("_")
+
+        return super().__new__(mcs, name, bases, namespace, **kwargs)
+
+
+# class BaseTable(SQLModel, metaclass=CustomMetaclass):
+class BaseTable(SQLModel):
     """Base Table.
 
     Description:
@@ -29,26 +54,13 @@ class BaseTable(DeclarativeBase):
 
     """
 
-    __abstract__ = True
-    metadata: MetaData = my_metadata  # type: ignore
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    created_at: datetime = Field(default_factory=now)
+    updated_at: datetime | None = Field(
+        default=None, sa_column_kwargs={"onupdate": now()}
+    )
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    class BaseConfig:
+        """Configuration for BaseTable."""
 
-    @declared_attr.directive
-    def __tablename__(self) -> str:
-        """Generate table name automatically."""
-        return (
-            "".join(
-                f"_{c.lower()}" if c.isupper() else c for c in self.__name__
-            )
-            .lstrip("_")
-            .removesuffix("_table")
-        )
-
-    # Convert to dictionary
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            column.name: getattr(self, column.name)
-            for column in self.__table__.columns
-        }
+        arbitrary_types_allowed = True

@@ -1,7 +1,7 @@
 """Customer Package.
 
 Description:
-- This package contains the Customer modules for the workshop management
+- This package contains Customer modules for workshop management
 system.
 
 """

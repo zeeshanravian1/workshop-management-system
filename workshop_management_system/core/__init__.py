@@ -1,6 +1,6 @@
 """Core Package.
 
 Description:
-- This package contains the core modules for the workshop management system.
+- This package contains core modules for workshop management system.
 
 """

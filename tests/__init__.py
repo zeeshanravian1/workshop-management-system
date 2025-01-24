@@ -1,6 +1,6 @@
 """Workshop Tests Package.
 
 Description:
-- This package contains test cases for the workshop.
+- This package contains test cases for workshop.
 
 """

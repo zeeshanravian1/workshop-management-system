@@ -20,7 +20,7 @@ from alembic.context import (
     run_migrations,
 )
 from workshop_management_system.core.config import DATABASE_URL
-from workshop_management_system.database.connection import my_metadata
+from workshop_management_system.database.connection import BaseTable
 
 
 def load_all_models() -> None:
@@ -46,13 +46,13 @@ def load_all_models() -> None:
 load_all_models()
 
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
+# this is Alembic Config object, which provides
+# access to values within .ini file in use.
 config: Config = config  # pylint: disable=E1101
 
 config.set_main_option(name="sqlalchemy.url", value=DATABASE_URL)
 
-# Interpret the config file for Python logging.
+# Interpret config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(fname=config.config_file_name)
@@ -61,9 +61,9 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata: MetaData = my_metadata
+target_metadata: MetaData = BaseTable.metadata
 
-# other values from the config, defined by the needs of env.py,
+# other values from config, defined by needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
@@ -72,12 +72,12 @@ target_metadata: MetaData = my_metadata
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
-    This configures the context with just a URL
+    This configures context with just a URL
     and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
+    here as well.  By skipping Engine creation
     we don't even need a DBAPI to be available.
 
-    Calls to context.execute() here emit the given string to the
+    Calls to context.execute() here emit given string to the
     script output.
 
     """
@@ -97,7 +97,7 @@ def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
     In this scenario we need to create an Engine
-    and associate a connection with the context.
+    and associate a connection with context.
 
     """
     connectable: Engine = engine_from_config(
