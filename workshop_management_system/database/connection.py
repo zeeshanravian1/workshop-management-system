@@ -8,9 +8,9 @@ Description:
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine
 from sqlalchemy.sql.functions import now
-from sqlmodel import Field, MetaData, SQLModel
+from sqlmodel import Field, MetaData, SQLModel, create_engine
 
 from workshop_management_system.core.config import DATABASE_URL
 

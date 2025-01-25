@@ -22,8 +22,8 @@ with get_session() as session:
     print("Creating Customers...")
     # Create a customer
     new_customer1: Customer = customer_view.create(
-        session,
-        Customer(
+        db_session=session,
+        record=Customer(
             name="John Doe",
             mobile_number="1234567890",
             vehicle_registration_number="ABC123",
@@ -35,8 +35,8 @@ with get_session() as session:
 
     # Create another customer
     new_customer2: Customer = customer_view.create(
-        session,
-        Customer(
+        db_session=session,
+        record=Customer(
             name="Jane Doe",
             mobile_number="0987654321",
             vehicle_registration_number="XYZ789",
@@ -77,7 +77,7 @@ with get_session() as session:
 
     print("Get All Customers...")
     # Read all customers
-    customers: Sequence[Customer] = customer_view.read_all(session)
+    customers: Sequence[Customer] = customer_view.read_all(db_session=session)
 
     for customer in customers:
         print(f"Customer: {customer.model_dump()}")
@@ -87,7 +87,7 @@ with get_session() as session:
     print("Updating Customer...")
     # Update a customer
     updated_customer: Customer | None = customer_view.update(
-        session,
+        db_session=session,
         record_id=new_customer1.id,
         record=Customer(
             name="John Smith",
@@ -108,7 +108,7 @@ with get_session() as session:
     print("Updating Non Existent Customer...")
     # Update a non-existent customer
     updated_non_existent_customer: Customer | None = customer_view.update(
-        session,
+        db_session=session,
         record_id=UUID("00000000-0000-0000-0000-000000000000"),
         record=Customer(
             name="John Smith",
@@ -131,7 +131,7 @@ with get_session() as session:
     print("Deleting Customer...")
     # Delete a customer
     deleted_customer: Customer | None = customer_view.delete(
-        session, record_id=new_customer2.id
+        db_session=session, record_id=new_customer2.id
     )
 
     if deleted_customer:
@@ -144,7 +144,7 @@ with get_session() as session:
     print("Deleting Non Existent Customer...")
     # Delete a non-existent customer
     deleted_non_existent_customer: Customer | None = customer_view.delete(
-        session,
+        db_session=session,
         record_id=UUID("00000000-0000-0000-0000-000000000000"),
     )
 

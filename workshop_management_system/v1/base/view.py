@@ -9,8 +9,7 @@ from collections.abc import Sequence
 from typing import Generic, TypeVar
 from uuid import UUID
 
-from sqlalchemy.orm import Session
-from sqlalchemy.sql import update
+from sqlmodel import Session, select, update
 
 from workshop_management_system.database.connection import Base
 
@@ -21,7 +20,7 @@ class BaseView(Generic[Model]):
     """Base View Class.
 
     Description:
-    - This class provides a generic CRUD interface for SQLAlchemy models.
+    - This class provides a generic CRUD interface for SQLModel models.
 
     """
 
@@ -29,7 +28,7 @@ class BaseView(Generic[Model]):
         """Initialize BaseView.
 
         :Args:
-        - `model` (Type[Model]): SQLAlchemy model class. **(Required)**
+        - `model` (Type[Model]): SQLModel model class. **(Required)**
 
         :Returns:
         - `None`
@@ -41,7 +40,7 @@ class BaseView(Generic[Model]):
         """Create a new record in database.
 
         :Args:
-        - `db_session` (Session): SQLAlchemy database session. **(Required)**
+        - `db_session` (Session): SQLModel database session. **(Required)**
         - `record` (Model): Model object to be added to database.
         **(Required)**
 
@@ -61,7 +60,7 @@ class BaseView(Generic[Model]):
         """Retrieve a record by its ID.
 
         :Args:
-        - `db_session` (Session): SQLAlchemy database session. **(Required)**
+        - `db_session` (Session): SQLModel database session. **(Required)**
         - `record_id` (UUID | int): ID of record. **(Required)**
 
         :Returns:
@@ -74,13 +73,13 @@ class BaseView(Generic[Model]):
         """Retrieve all records for model.
 
         :Args:
-        - `db_session` (Session): SQLAlchemy database session. **(Required)**
+        - `db_session` (Session): SQLModel database session. **(Required)**
 
         :Returns:
         - `Sequence[Model]`: List of all records.
 
         """
-        return db_session.query(self.model).all()
+        return db_session.exec(select(self.model)).all()
 
     def update(
         self, db_session: Session, record_id: UUID | int, record: Model
@@ -88,7 +87,7 @@ class BaseView(Generic[Model]):
         """Update a record by its ID.
 
         :Args:
-        - `db_session` (Session): SQLAlchemy database session. **(Required)**
+        - `db_session` (Session): SQLModel database session. **(Required)**
         - `record_id` (UUID | int): ID of record to update. **(Required)**
         - `record` (Model): Model containing updated fields. **(Required)**
 
@@ -111,7 +110,7 @@ class BaseView(Generic[Model]):
         """Delete a record by its ID.
 
         :Args:
-        - `db_session` (Session): SQLAlchemy database session. **(Required)**
+        - `db_session` (Session): SQLModel database session. **(Required)**
         - `record_id` (UUID | int): ID of record to delete. **(Required)**
 
         :Returns:
