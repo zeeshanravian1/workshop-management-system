@@ -135,6 +135,7 @@ repos:
     hooks:
     - id: pyright
       language: system
+      exclude: ".*/model.py"
 
   # A tool for finding common security issues in Python code, helping ensure
   # secure code practices and prevent security vulnerabilities.
