@@ -4,10 +4,14 @@ Description:
 - This module contains model for serviceitem table.
 """
 
+from typing import TYPE_CHECKING
+
 from sqlmodel import Field, Relationship
 
 from workshop_management_system.database.connection import Base
-from workshop_management_system.v1.jobcard.model import JobCard
+
+if TYPE_CHECKING:
+    from workshop_management_system.v1.jobcard.model import JobCard
 
 
 class ServiceItem(Base, table=True):
@@ -21,4 +25,4 @@ class ServiceItem(Base, table=True):
     discount: float
     total_amount: float
 
-    job_card: JobCard = Relationship(back_populates="service_item")
+    job_card: "JobCard" = Relationship(back_populates="service_items")

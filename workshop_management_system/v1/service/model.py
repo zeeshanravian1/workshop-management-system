@@ -4,10 +4,14 @@ Description:
 - This module contains model for service table.
 """
 
+from typing import TYPE_CHECKING
+
 from sqlmodel import Field, Relationship
 
 from workshop_management_system.database.connection import Base
-from workshop_management_system.v1.jobcard.model import JobCard
+
+if TYPE_CHECKING:
+    from workshop_management_system.v1.jobcard.model import JobCard
 
 
 class Service(Base, table=True):
@@ -18,5 +22,4 @@ class Service(Base, table=True):
     description: str = Field()
     cost: float = Field()
 
-    job_card: JobCard = Relationship(back_populates="services")
-
+    job_card: "JobCard" = Relationship(back_populates="services")
