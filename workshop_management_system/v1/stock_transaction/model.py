@@ -5,7 +5,6 @@ Description:
 """
 
 from datetime import datetime
-from uuid import UUID
 
 from sqlmodel import Field, Relationship
 
@@ -17,7 +16,8 @@ from workshop_management_system.v1.jobcard.model import JobCard
 class StockTransaction(Base, table=True):
     """Stock Transaction Table."""
 
-    inventory_id: UUID = Field(foreign_key="inventory.id")
+    id: int = Field(primary_key=True, index=True)
+    inventory_id: int = Field(foreign_key="inventory.id")
     transaction_type: str = Field(max_length=50)
     quantity: int
     transaction_date: datetime
