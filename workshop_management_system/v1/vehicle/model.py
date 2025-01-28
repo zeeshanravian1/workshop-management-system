@@ -24,3 +24,4 @@ class Vehicle(Base, table=True):
     customer_id: UUID = Field(foreign_key="customer.id")
 
     customer: Customer = Relationship(back_populates="vehicles")
+    
