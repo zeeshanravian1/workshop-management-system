@@ -5,9 +5,16 @@ Description:
 
 """
 
+from typing import TYPE_CHECKING
+
 from sqlmodel import Field, Relationship
 
 from workshop_management_system.database.connection import Base
+
+if TYPE_CHECKING:
+    from ..estimate.model import Estimate
+    from ..feedback.model import FeedBack
+    from ..vehicle.model import Vehicle
 
 
 class Customer(Base, table=True):
@@ -20,3 +27,5 @@ class Customer(Base, table=True):
     address: str
 
     vehicles: list["Vehicle"] = Relationship(back_populates="customer")
+    estimates: list["Estimate"] = Relationship(back_populates="customer")
+    feedbacks: list["FeedBack"] = Relationship(back_populates="customer")
