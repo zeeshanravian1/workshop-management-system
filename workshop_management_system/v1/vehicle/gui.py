@@ -5,7 +5,6 @@ Description:
 
 """
 
-from uuid import UUID
 
 from PyQt6.QtWidgets import (
     QApplication,
@@ -262,7 +261,7 @@ class VehicleGUI(QMainWindow):
 
                 with Session(engine) as session:
                     vehicle_obj = self.vehicle_view.read_by_id(
-                        db_session=session, record_id=UUID(vehicle_id)
+                        db_session=session, record_id=int(vehicle_id)
                     )
                     if vehicle_obj:
                         customer = session.exec(
@@ -284,7 +283,7 @@ class VehicleGUI(QMainWindow):
                         vehicle_obj.customer_id = customer.id
                         self.vehicle_view.update(
                             db_session=session,
-                            record_id=UUID(vehicle_id),
+                            record_id=int(vehicle_id),
                             record=vehicle_obj,
                         )
                         QMessageBox.information(
@@ -324,7 +323,7 @@ class VehicleGUI(QMainWindow):
             if confirmation == QMessageBox.StandardButton.Yes:
                 with Session(engine) as session:
                     self.vehicle_view.delete(
-                        db_session=session, record_id=UUID(vehicle_id)
+                        db_session=session, record_id=int(vehicle_id)
                     )
                     QMessageBox.information(
                         self, "Success", "Vehicle deleted successfully!"

@@ -6,7 +6,6 @@ Description:
 """
 
 from datetime import datetime
-from uuid import UUID
 
 from PyQt6.QtWidgets import (
     QApplication,
@@ -184,7 +183,7 @@ class EstimateGUI(QMainWindow):
                 with Session(engine) as session:
                     vehicle = session.exec(
                         select(Vehicle)
-                        .where(Vehicle.id == UUID(data["vehicle_id"]))
+                        .where(Vehicle.id == int(data["vehicle_id"]))
                     ).first()
                     if not vehicle:
                         raise ValueError("Vehicle not found")
@@ -233,13 +232,13 @@ class EstimateGUI(QMainWindow):
                 with Session(engine) as session:
                     vehicle = session.exec(
                         select(Vehicle)
-                        .where(Vehicle.id == UUID(data["vehicle_id"]))
+                        .where(Vehicle.id == int(data["vehicle_id"]))
                     ).first()
                     if not vehicle:
                         raise ValueError("Vehicle not found")
 
                     estimate_obj = self.estimate_view.read_by_id(
-                        db_session=session, record_id=UUID(estimate_id)
+                        db_session=session, record_id=int(estimate_id)
                     )
                     if estimate_obj:
                         estimate_obj.estimate_date = datetime.now()
@@ -252,7 +251,7 @@ class EstimateGUI(QMainWindow):
                         estimate_obj.vehicle_id = vehicle.id
                         self.estimate_view.update(
                             db_session=session,
-                            record_id=UUID(estimate_id),
+                            record_id=int(estimate_id),
                             record=estimate_obj,
                         )
                         QMessageBox.information(
@@ -292,7 +291,7 @@ class EstimateGUI(QMainWindow):
             if confirmation == QMessageBox.StandardButton.Yes:
                 with Session(engine) as session:
                     self.estimate_view.delete(
-                        db_session=session, record_id=UUID(estimate_id)
+                        db_session=session, record_id=int(estimate_id)
                     )
                     QMessageBox.information(
                         self, "Success", "Estimate deleted successfully!"

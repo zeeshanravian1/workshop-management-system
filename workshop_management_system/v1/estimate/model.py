@@ -6,7 +6,7 @@ Description:
 
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
-from uuid import UUID
+
 
 from sqlmodel import Field, Relationship
 
@@ -27,8 +27,8 @@ class Estimate(Base, table=True):
     total_estimate_amount: float = Field(default=0.0)
     status: str = Field(max_length=50)
     description: str | None = Field(max_length=255, default=None)
-    customer_id: UUID = Field(foreign_key="customer.id")
-    vehicle_id: UUID = Field(foreign_key="vehicle.id")
+    customer_id: int = Field(foreign_key="customer.id")
+    vehicle_id: int = Field(foreign_key="vehicle.id")
 
     customer: Optional["Customer"] = Relationship(back_populates="estimates")
     vehicle: Optional["Vehicle"] = Relationship(back_populates="estimates")

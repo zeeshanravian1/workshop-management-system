@@ -25,20 +25,3 @@ class Employee(Base, table=True):
     is_active: bool = Field(default=True)
 
     feedbacks: list["FeedBack"] = Relationship(back_populates="employee")
-
-    # supervised_jobs: list["JobCard"] = Relationship(  # type: ignore
-    #     back_populates="supervisor",
-    #     sa_relationship_kwargs={
-    #         "foreign_keys": "JobCardTable.supervisor_id"
-    #     },
-    # )
-    # mechanic_jobs: list["JobCard"] = Relationship(  # type: ignore
-    #     back_populates="mechanic",
-    #     sa_relationship_kwargs={"foreign_keys": "JobCardTable.mechanic_id"},
-    # )
-    # electrician_jobs: list["JobCardTable"] = Relationship(  # type: ignore
-    #     back_populates="electrician",
-    #     sa_relationship_kwargs={
-    #         "foreign_keys": "JobCardTable.electrician_id"
-    #     }
-    # )

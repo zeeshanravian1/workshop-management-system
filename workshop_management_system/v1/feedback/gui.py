@@ -5,7 +5,6 @@ Description:
 
 """
 
-from uuid import UUID
 
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 from PyQt6.QtWidgets import (
@@ -229,7 +228,7 @@ class FeedBackGUI(QMainWindow):
                 data = dialog.get_data()
                 with Session(engine) as session:
                     feedback_obj = self.feedback_view.read_by_id(
-                        db_session=session, record_id=UUID(feedback_id)
+                        db_session=session, record_id=int(feedback_id)
                     )
                     if feedback_obj:
                         customer = session.exec(
@@ -254,7 +253,7 @@ class FeedBackGUI(QMainWindow):
                         feedback_obj.employee_id = employee.id
                         self.feedback_view.update(
                             db_session=session,
-                            record_id=UUID(feedback_id),
+                            record_id=int(feedback_id),
                             record=feedback_obj,
                         )
                         QMessageBox.information(
@@ -294,7 +293,7 @@ class FeedBackGUI(QMainWindow):
             if confirmation == QMessageBox.StandardButton.Yes:
                 with Session(engine) as session:
                     self.feedback_view.delete(
-                        db_session=session, record_id=UUID(feedback_id)
+                        db_session=session, record_id=int(feedback_id)
                     )
                     QMessageBox.information(
                         self, "Success", "Feedback deleted successfully!"

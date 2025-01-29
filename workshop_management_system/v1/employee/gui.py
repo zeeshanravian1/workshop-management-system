@@ -5,7 +5,7 @@ Description:
 
 """
 
-from uuid import UUID
+
 
 from PyQt6.QtWidgets import (
     QApplication,
@@ -227,7 +227,7 @@ class EmployeeGUI(QMainWindow):
 
             with Session(engine) as session:
                 employee_obj = self.employee_view.read_by_id(
-                    db_session=session, record_id=UUID(employee_id)
+                    db_session=session, record_id=int(employee_id)
                 )
                 if employee_obj:
                     employee_obj.name = name
@@ -237,7 +237,7 @@ class EmployeeGUI(QMainWindow):
                     employee_obj.role = role
                     self.employee_view.update(
                         db_session=session,
-                        record_id=UUID(employee_id),
+                        record_id=int(employee_id),
                         record=employee_obj,
                     )
                     QMessageBox.information(
@@ -277,7 +277,7 @@ class EmployeeGUI(QMainWindow):
             if confirmation == QMessageBox.StandardButton.Yes:
                 with Session(engine) as session:
                     self.employee_view.delete(
-                        db_session=session, record_id=UUID(employee_id)
+                        db_session=session, record_id=int(employee_id)
                     )
                     QMessageBox.information(
                         self, "Success", "Employee deleted successfully!"

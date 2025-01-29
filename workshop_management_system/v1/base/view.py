@@ -82,13 +82,13 @@ class BaseView(Generic[Model]):
         return db_session.exec(select(self.model)).all()
 
     def update(
-        self, db_session: Session, record_id: UUID | int, record: Model
+        self, db_session: Session, record_id: int, record: Model
     ) -> Model | None:
         """Update a record by its ID.
 
         :Args:
         - `db_session` (Session): SQLModel database session. **(Required)**
-        - `record_id` (UUID | int): ID of record to update. **(Required)**
+        - `record_id` (int): ID of record to update. **(Required)**
         - `record` (Model): Model containing updated fields. **(Required)**
 
         :Returns:

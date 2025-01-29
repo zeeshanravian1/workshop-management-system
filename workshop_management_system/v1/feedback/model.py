@@ -7,7 +7,6 @@ Description:
 
 # from typing import TYPE_CHECKING
 from typing import TYPE_CHECKING, Optional
-from uuid import UUID
 
 from sqlmodel import Field, Relationship
 
@@ -26,8 +25,8 @@ class FeedBack(Base, table=True):
 
     description: str = Field()
     status: str = Field(max_length=50)
-    customer_id: UUID = Field(foreign_key="customer.id")
-    employee_id: UUID = Field(foreign_key="employee.id")
+    customer_id: int = Field(foreign_key="customer.id")
+    employee_id: int = Field(foreign_key="employee.id")
 
     customer: Optional["Customer"] = Relationship(back_populates="feedbacks")
     employee: Optional["Employee"] = Relationship(back_populates="feedbacks")

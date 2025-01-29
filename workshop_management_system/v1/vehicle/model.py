@@ -6,7 +6,6 @@ Description:
 """
 
 from typing import TYPE_CHECKING, Optional
-from uuid import UUID
 
 from sqlmodel import Field, Relationship
 
@@ -27,7 +26,7 @@ class Vehicle(Base, table=True):
     year: int
     chassis_number: str = Field(max_length=50)
     engine_number: str = Field(max_length=50)
-    customer_id: UUID = Field(foreign_key="customer.id")
+    customer_id: int = Field(foreign_key="customer.id")
 
     # customer: Customer = Relationship(back_populates="vehicles")
     customer: Optional["Customer"] = Relationship(back_populates="vehicles")
