@@ -5,19 +5,22 @@ Description:
 """
 
 from datetime import datetime
-from uuid import UUID
+from typing import TYPE_CHECKING
 
-from sqlmodel import Field, Relationship
+from sqlmodel import Field, Relationship, SQLModel
 
-from workshop_management_system.database.connection import Base
 from workshop_management_system.v1.customer.model import Customer
 
+if TYPE_CHECKING:
+    from workshop_management_system.v1.jobcard.model import JobCard
 
-class Payment(Base, table=True):
+
+class Payment(SQLModel, table=True):
     """Payment Table."""
 
-    customer_id: UUID = Field(foreign_key="customer.id")
-    job_card_id: UUID = Field(foreign_key="jobcard.id")
+    payment_id: int | None = Field(default=None, primary_key=True)
+    customer_id: int = Field(foreign_key="customer.id")
+    job_card_id: int = Field(foreign_key="jobcard.id")
     amount: float = Field(max_digits=10, decimal_places=2)
     payment_date: datetime
     payment_method: str = Field(max_length=50)
@@ -25,3 +28,4 @@ class Payment(Base, table=True):
     status: str = Field(max_length=50)
 
     customer: Customer = Relationship(back_populates="payments")
+    job_card: "JobCard" = Relationship(back_populates="payments")

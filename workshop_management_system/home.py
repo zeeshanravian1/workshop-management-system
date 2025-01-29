@@ -15,6 +15,10 @@ from PyQt6.QtWidgets import (
 )
 
 from workshop_management_system.v1.customer.gui import CustomerGUI
+from workshop_management_system.v1.inventory.gui import InventoryGUI
+from workshop_management_system.v1.jobcard.gui import JobCardGUI
+from workshop_management_system.v1.notification.gui import NotificationGUI
+from workshop_management_system.v1.payment.gui import PaymentGUI
 
 
 class HomeGUI(QMainWindow):
@@ -45,6 +49,14 @@ class HomeGUI(QMainWindow):
         self.job_card_button.clicked.connect(self.open_job_card_gui)
         self.main_layout.addWidget(self.job_card_button)
 
+        self.payment_button = QPushButton("Manage Payments")
+        self.payment_button.clicked.connect(self.open_payment_gui)
+        self.main_layout.addWidget(self.payment_button)
+
+        self.notification_button = QPushButton("Manage Notifications")
+        self.notification_button.clicked.connect(self.open_notification_gui)
+        self.main_layout.addWidget(self.notification_button)
+
         container = QWidget()
         container.setLayout(self.main_layout)
         self.setCentralWidget(container)
@@ -56,13 +68,23 @@ class HomeGUI(QMainWindow):
 
     def open_inventory_gui(self):
         """Open the Inventory Management GUI."""
-        # Placeholder for opening Inventory GUI
-        pass
+        self.inventory_window = InventoryGUI()
+        self.inventory_window.show()
 
     def open_job_card_gui(self):
         """Open the Job Card Management GUI."""
-        # Placeholder for opening Job Card GUI
-        pass
+        self.jobcard_window = JobCardGUI()
+        self.jobcard_window.show()
+
+    def open_payment_gui(self):
+        """Open the Payment Management GUI."""
+        self.payment_window = PaymentGUI()
+        self.payment_window.show()
+
+    def open_notification_gui(self):
+        """Open the Notification Management GUI."""
+        self.notification_window = NotificationGUI()
+        self.notification_window.show()
 
 
 if __name__ == "__main__":

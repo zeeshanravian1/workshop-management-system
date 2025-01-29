@@ -5,36 +5,39 @@ Description:
 """
 
 from datetime import datetime
-from uuid import UUID
+from typing import TYPE_CHECKING
 
 from sqlmodel import Field, Relationship
 
 from workshop_management_system.database.connection import Base
-from workshop_management_system.v1.customer.model import Customer
-from workshop_management_system.v1.employee.model import Employee
-from workshop_management_system.v1.vehicle.model import Vehicle
+
+if TYPE_CHECKING:
+    from workshop_management_system.v1.customer.model import Customer
+    from workshop_management_system.v1.employee.model import Employee
+    from workshop_management_system.v1.service.model import Service
+    from workshop_management_system.v1.service_item.model import ServiceItem
+    from workshop_management_system.v1.vehicle.model import Vehicle
 
 
 class JobCard(Base, table=True):
     """Job Card Table."""
 
-    customer_id: UUID = Field(foreign_key="customer.id")
-    vehicle_id: UUID = Field(foreign_key="vehicle.id")
+    jobcard_id: int | None = Field(default=None, primary_key=True)
+    customer_id: int = Field(foreign_key="customer.id")
+    vehicle_id: int = Field(foreign_key="vehicle.id")
     service_date: datetime
     status: str = Field(max_length=50)
     total_amount: float = Field(max_digits=10, decimal_places=2)
-    supervisor_id: UUID = Field(foreign_key="employee.id")
-    mechanic_id: UUID = Field(foreign_key="employee.id")
+    supervisor_id: int = Field(foreign_key="employee.id")
+    mechanic_id: int = Field(foreign_key="employee.id")
 
-    customer: Customer = Relationship(back_populates="job_cards")
-    vehicle: Vehicle = Relationship(back_populates="job_cards")
-    supervisor: Employee = Relationship(
+    customer: "Customer" = Relationship(back_populates="job_cards")
+    vehicle: "Vehicle" = Relationship(back_populates="job_cards")
+    supervisor: "Employee" = Relationship(
         back_populates="supervised_jobs",
-        sa_relationship_kwargs={
-            "foreign_keys": "[JobCardTable.supervisor_id]"
-        },
+        sa_relationship_kwargs={"foreign_keys": "[JobCard.supervisor_id]"},
     )
-    mechanic: Employee = Relationship(
+    mechanic: "Employee" = Relationship(
         back_populates="mechanic_jobs",
         sa_relationship_kwargs={"foreign_keys": "[JobCard.mechanic_id]"},
     )
