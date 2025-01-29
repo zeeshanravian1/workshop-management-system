@@ -19,6 +19,4 @@ class Customer(Base, table=True):
     email: str = Field(max_length=255)
     address: str
 
-    vehicles: list["Vehicle"] = Relationship(  # noqa: F821
-        back_populates="customer"
-    )
+    vehicles: list["Vehicle"] = Relationship(back_populates="customer")

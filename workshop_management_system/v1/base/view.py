@@ -95,7 +95,7 @@ class BaseView(Generic[Model]):
         - `Model | None`: Updated record, or None if not found.
 
         """
-        db_session.execute(
+        db_session.exec(
             statement=update(table=self.model)
             .where(self.model.id == record_id)  # type: ignore
             .values(record.model_dump(exclude_unset=True))
