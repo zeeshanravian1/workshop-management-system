@@ -20,8 +20,8 @@ class Payment(Base, table=True):
     job_card_id: UUID = Field(foreign_key="jobcard.id")
     amount: float = Field(max_digits=10, decimal_places=2)
     payment_date: datetime
-    credit: decimal
-    balance: decimal
+    credit: str
+    balance: str
     payment_method: str = Field(max_length=50)
     reference_number: str = Field(max_length=100)
     status: str = Field(max_length=50)
