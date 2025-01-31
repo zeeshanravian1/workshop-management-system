@@ -1,9 +1,4 @@
-"""FeedBack Models.
-
-Description:
-- This module contains model for feedback table.
-
-"""
+"""Complaint Models."""
 
 from typing import TYPE_CHECKING, Optional
 
@@ -16,11 +11,11 @@ if TYPE_CHECKING:
 
 
 class Complaint(Base, table=True):
-    """FeedBack Table."""
+    """Complaint Table."""
 
     description: str = Field()
     status: str = Field(max_length=50)
     priority: str = Field(max_length=50)
-    customer_id: int = Field(foreign_key="customer.id")
+    customer_id: int | None = Field(foreign_key="customer.id")
 
-    customer: Optional["Customer"] = Relationship(back_populates="complaint")
+    customer: Optional["Customer"] = Relationship(back_populates="complaints")

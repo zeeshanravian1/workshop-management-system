@@ -5,10 +5,14 @@ Description:
 
 """
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QApplication,
+    QFrame,
     QHBoxLayout,
     QInputDialog,
+    QLabel,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -25,74 +29,121 @@ from workshop_management_system.v1.customer.view import CustomerView
 
 
 class CustomerGUI(QMainWindow):
-    """Customer GUI Class.
-
-    Description:
-    - This class provides the GUI for managing customers.
-
-    """
+    """Customer GUI Class."""
 
     def __init__(self) -> None:
         """Initialize the Customer GUI."""
         super().__init__()
         self.setWindowTitle("Customer Management")
         self.setGeometry(100, 100, 800, 600)
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #f0f0f0;
+            }
+            QPushButton {
+                padding: 10px;
+                font-size: 14px;
+                background-color: #4CAF50;
+                color: white;
+                border-radius: 5px;
+                min-width: 120px;
+                margin: 5px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QTableWidget {
+                background-color: white;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QTableWidget::item {
+                padding: 5px;
+            }
+            QLabel {
+                color: #333;
+            }
+        """)
 
-        self.customer_view = CustomerView(
-            model=Customer
-        )  # Initialize CustomerView for CRUD operations
+        self.customer_view = CustomerView(model=Customer)
 
-        self.main_layout = QVBoxLayout()
+        # Central widget and main layout
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+
+        # Header
+        header_layout = QHBoxLayout()
+        title_label = QLabel("Customer Management")
+        title_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_layout.addWidget(title_label)
+        main_layout.addLayout(header_layout)
+
+        # Table Frame
+        table_frame = QFrame()
+        table_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        table_frame.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border-radius: 10px;
+                padding: 10px;
+            }
+        """)
+        table_layout = QVBoxLayout(table_frame)
 
         # Customer table
         self.customer_table = QTableWidget()
         self.customer_table.setSelectionBehavior(
-            self.customer_table.SelectionBehavior.SelectRows
+            QTableWidget.SelectionBehavior.SelectRows
         )
-        self.main_layout.addWidget(self.customer_table)
+        self.customer_table.setAlternatingRowColors(True)
+        table_layout.addWidget(self.customer_table)
+        main_layout.addWidget(table_frame)
 
-        # Buttons for CRUD operations
-        button_layout = QHBoxLayout()
+        # Button Frame
+        button_frame = QFrame()
+        button_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        button_frame.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border-radius: 10px;
+                padding: 10px;
+            }
+        """)
+        button_layout = QHBoxLayout(button_frame)
+        button_layout.setSpacing(10)
 
-        self.load_button = QPushButton("Load Customers")
-        self.load_button.clicked.connect(self.load_customers)
-        button_layout.addWidget(self.load_button)
+        # CRUD Buttons
+        buttons = [
+            ("Load Customers", self.load_customers),
+            ("Add Customer", self.add_customer),
+            ("Update Customer", self.update_customer),
+            ("Delete Customer", self.delete_customer),
+        ]
 
-        self.add_button = QPushButton("Add Customer")
-        self.add_button.clicked.connect(self.add_customer)
-        button_layout.addWidget(self.add_button)
+        for text, handler in buttons:
+            button = QPushButton(text)
+            button.clicked.connect(handler)
+            button_layout.addWidget(button)
 
-        self.update_button = QPushButton("Update Customer")
-        self.update_button.clicked.connect(self.update_customer)
-        button_layout.addWidget(self.update_button)
+        main_layout.addWidget(button_frame)
 
-        self.delete_button = QPushButton("Delete Customer")
-        self.delete_button.clicked.connect(self.delete_customer)
-        button_layout.addWidget(self.delete_button)
+        self.load_customers()
 
-        self.main_layout.addLayout(button_layout)
-
-        container = QWidget()
-        container.setLayout(self.main_layout)
-        self.setCentralWidget(container)
-
-        self.load_customers()  # Load customers on initialization
-
-    def load_customers(self):
-        """Load customers from the database and display them in the table."""
+    def load_customers(self) -> None:
+        """Load customers from the database."""
         try:
             with Session(engine) as session:
                 customers = self.customer_view.read_all(db_session=session)
                 self.customer_table.setRowCount(len(customers))
-                self.customer_table.setColumnCount(6)
+                self.customer_table.setColumnCount(
+                    5
+                )  # ID, Name, Mobile, Email, Address
                 self.customer_table.setHorizontalHeaderLabels(
-                    [
-                        "Name",
-                        "Mobile",
-                        "Email",
-                        "Address",
-                        "Vehicle Registration",
-                    ]
+                    ["ID", "Name", "Mobile", "Email", "Address"]
                 )
 
                 for row, customer in enumerate(customers):
@@ -111,17 +162,15 @@ class CustomerGUI(QMainWindow):
                     self.customer_table.setItem(
                         row, 4, QTableWidgetItem(customer.address)
                     )
-                    self.customer_table.setItem(
-                        row,
-                        5,
-                        QTableWidgetItem(customer.vehicle_registration_number),
-                    )
+
+                # Adjust column widths
+                self.customer_table.resizeColumnsToContents()
         except Exception as e:
             QMessageBox.critical(
                 self, "Error", f"Failed to load customers: {e!s}"
             )
 
-    def add_customer(self):
+    def add_customer(self) -> None:
         """Add a new customer to the database."""
         try:
             # Get customer details from user
@@ -149,19 +198,12 @@ class CustomerGUI(QMainWindow):
             if not ok or not address:
                 return
 
-            vehicle_reg, ok = QInputDialog.getText(
-                self, "Add Customer", "Enter Vehicle Registration Number:"
-            )
-            if not ok or not vehicle_reg:
-                return
-
             with Session(engine) as session:
                 new_customer = Customer(
                     name=name,
                     mobile_number=mobile,
                     email=email,
                     address=address,
-                    vehicle_registration_number=vehicle_reg,
                 )
                 self.customer_view.create(
                     db_session=session, record=new_customer
@@ -175,7 +217,7 @@ class CustomerGUI(QMainWindow):
                 self, "Error", f"Failed to add customer: {e!s}"
             )
 
-    def update_customer(self):
+    def update_customer(self) -> None:
         """Update an existing customer."""
         try:
             selected_row = self.customer_table.currentRow()
@@ -191,55 +233,36 @@ class CustomerGUI(QMainWindow):
                     self, "Warning", "Selected customer ID is invalid."
                 )
                 return
-            customer_id = item.text()
+            customer_id = int(item.text())
 
-            # Get updated details from user
-            name, ok = QInputDialog.getText(
-                self, "Update Customer", "Enter New Name:"
-            )
-            if not ok or not name:
-                return
+            # Get updated details
+            fields = {
+                "Name": "name",
+                "Mobile Number": "mobile_number",
+                "Email": "email",
+                "Address": "address",
+            }
 
-            mobile, ok = QInputDialog.getText(
-                self, "Update Customer", "Enter New Mobile Number:"
-            )
-            if not ok or not mobile:
-                return
-
-            email, ok = QInputDialog.getText(
-                self, "Update Customer", "Enter New Email Address:"
-            )
-            if not ok or not email:
-                return
-
-            address, ok = QInputDialog.getText(
-                self, "Update Customer", "Enter New Address:"
-            )
-            if not ok or not address:
-                return
-
-            vehicle_reg, ok = QInputDialog.getText(
-                self,
-                "Update Customer",
-                "Enter New Vehicle Registration Number:",
-            )
-            if not ok or not vehicle_reg:
-                return
+            new_values = {}
+            for label, field in fields.items():
+                value, ok = QInputDialog.getText(
+                    self, "Update Customer", f"Enter New {label}:"
+                )
+                if not ok:
+                    return
+                new_values[field] = value
 
             with Session(engine) as session:
-                customer_obj = self.customer_view.read_by_id(
-                    db_session=session, record_id=int(customer_id)
+                customer = self.customer_view.read_by_id(
+                    db_session=session, record_id=customer_id
                 )
-                if customer_obj:
-                    customer_obj.name = name
-                    customer_obj.mobile_number = mobile
-                    customer_obj.email = email
-                    customer_obj.address = address
-                    customer_obj.vehicle_registration_number = vehicle_reg
+                if customer:
+                    for field, value in new_values.items():
+                        setattr(customer, field, value)
                     self.customer_view.update(
                         db_session=session,
-                        record_id=int(customer_id),
-                        record=customer_obj,
+                        record_id=customer_id,
+                        record=customer,
                     )
                     QMessageBox.information(
                         self, "Success", "Customer updated successfully!"
@@ -250,7 +273,7 @@ class CustomerGUI(QMainWindow):
                 self, "Error", f"Failed to update customer: {e!s}"
             )
 
-    def delete_customer(self):
+    def delete_customer(self) -> None:
         """Delete a customer from the database."""
         try:
             selected_row = self.customer_table.currentRow()

@@ -7,15 +7,16 @@ Description:
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship
 
+from workshop_management_system.database.connection import Base
 from workshop_management_system.v1.customer.model import Customer
 
 if TYPE_CHECKING:
     from workshop_management_system.v1.jobcard.model import JobCard
 
 
-class Payment(SQLModel, table=True):
+class Payment(Base, table=True):
     """Payment Table."""
 
     customer_id: int = Field(foreign_key="customer.id")

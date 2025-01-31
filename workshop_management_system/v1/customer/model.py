@@ -28,5 +28,5 @@ class Customer(Base, table=True):
 
     vehicles: list["Vehicle"] = Relationship(back_populates="customer")
     estimates: list["Estimate"] = Relationship(back_populates="customer")
-    complaint: list["Complaint"] = Relationship(back_populates="customer")
+    complaints: list["Complaint"] = Relationship(back_populates="customer")
     payments: list["Payment"] = Relationship(back_populates="customer")
