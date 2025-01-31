@@ -71,16 +71,16 @@ class CustomerComboBox(QComboBox):
                 customers = session.exec(select(Customer)).all()
                 self.clear()
                 self.customer_ids.clear()
-                
                 # Add a default placeholder item
                 self.addItem("Select a customer...")
                 self.customer_ids.append(None)
-                
                 for customer in customers:
                     self.customer_ids.append(customer.id)
                     display_text = (
-                        f"<span style='font-weight:bold;'>{customer.name}</span> "
-                        f"<span style='color:#666666;'>({customer.mobile_number})</span>"
+                        f"<span style='font-weight:bold;'>"
+                        f"{customer.name}</span> "
+                        f"<span style='color:#666666;'>"
+                        f"({customer.mobile_number})</span>"
                     )
                     self.addItem(display_text)
         except Exception as e:
@@ -330,7 +330,6 @@ class VehicleGUI(QMainWindow):
         """Add a new vehicle to the database."""
         try:
             dialog, inputs = self.create_input_dialog("Add Vehicle")
-            
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 customer_id = inputs["customer"].get_selected_customer_id()
                 if not customer_id:
