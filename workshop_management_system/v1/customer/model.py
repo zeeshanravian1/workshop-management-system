@@ -12,8 +12,8 @@ from sqlmodel import Field, Relationship
 from workshop_management_system.database.connection import Base
 
 if TYPE_CHECKING:
+    from ..complaint.model import Complaint
     from ..estimate.model import Estimate
-    from ..feedback.model import FeedBack
     from ..payment.model import Payment
     from ..vehicle.model import Vehicle
 
@@ -23,12 +23,10 @@ class Customer(Base, table=True):
 
     name: str = Field(max_length=2_55)
     mobile_number: str = Field(max_length=20)
-    vehicle_registration_number: str = Field(max_length=50)
     email: str = Field(max_length=255)
     address: str
 
     vehicles: list["Vehicle"] = Relationship(back_populates="customer")
     estimates: list["Estimate"] = Relationship(back_populates="customer")
-    feedbacks: list["FeedBack"] = Relationship(back_populates="customer")
-    # job_cards: list["JobCard"] = Relationship(back_populates="customer")
+    complaint: list["Complaint"] = Relationship(back_populates="customer")
     payments: list["Payment"] = Relationship(back_populates="customer")

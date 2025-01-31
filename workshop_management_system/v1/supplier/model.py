@@ -17,11 +17,10 @@ if TYPE_CHECKING:
 class Supplier(Base, table=True):
     """Supplier Table."""
 
-    # supplier_id: int | None = Field(default=None, primary_key=True)
     name: str = Field(max_length=255)
+    email: str = Field(max_length=255)
     contact_number: str = Field(max_length=20)
     address: str = Field()
     inventory_items: list["Inventory"] = Relationship(
         back_populates="supplier"
     )
-    

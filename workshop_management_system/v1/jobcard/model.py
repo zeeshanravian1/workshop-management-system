@@ -12,7 +12,6 @@ from sqlmodel import Field, Relationship
 from workshop_management_system.database.connection import Base
 
 if TYPE_CHECKING:
-    from workshop_management_system.v1.employee.model import Employee
     from workshop_management_system.v1.payment.model import Payment
     from workshop_management_system.v1.service.model import Service
     from workshop_management_system.v1.service_item.model import ServiceItem
@@ -25,26 +24,13 @@ if TYPE_CHECKING:
 class JobCard(Base, table=True):
     """Job Card Table."""
 
-    jobcard_id: int | None = Field(default=None, primary_key=True)
-    customer_id: int = Field(foreign_key="customer.id")
     vehicle_id: int = Field(foreign_key="vehicle.id")
     service_date: datetime
     status: str = Field(max_length=50)
     total_amount: float = Field(max_digits=10, decimal_places=2)
-    supervisor_id: int = Field(foreign_key="employee.id")
-    mechanic_id: int = Field(foreign_key="employee.id")
+    description: str = Field(max_length=300)
 
-    # customer: "Customer" = Relationship(back_populates="job_cards")
     vehicle: "Vehicle" = Relationship(back_populates="job_cards")
-
-    supervisor: "Employee" = Relationship(
-        back_populates="supervised_jobs",
-        sa_relationship_kwargs={"foreign_keys": "[JobCard.supervisor_id]"},
-    )
-    mechanic: "Employee" = Relationship(
-        back_populates="mechanic_jobs",
-        sa_relationship_kwargs={"foreign_keys": "[JobCard.mechanic_id]"},
-    )
 
     services: list["Service"] = Relationship(back_populates="job_card")
     service_items: list["ServiceItem"] = Relationship(

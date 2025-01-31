@@ -18,10 +18,11 @@ if TYPE_CHECKING:
 class Payment(SQLModel, table=True):
     """Payment Table."""
 
-    payment_id: int | None = Field(default=None, primary_key=True)
     customer_id: int = Field(foreign_key="customer.id")
     job_card_id: int = Field(foreign_key="jobcard.id")
     amount: float = Field(max_digits=10, decimal_places=2)
+    credit: float = Field(max_digits=10, decimal_places=2)
+    balance: float = Field(max_digits=10, decimal_places=2)
     payment_date: datetime
     payment_method: str = Field(max_length=50)
     reference_number: str = Field(max_length=100)

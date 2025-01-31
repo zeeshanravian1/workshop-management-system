@@ -80,7 +80,7 @@ class EstimateGUI(QMainWindow):
 
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the Estimate GUI."""
         super().__init__()
         self.setWindowTitle("Estimate Management")
@@ -126,7 +126,7 @@ class EstimateGUI(QMainWindow):
 
         self.load_estimates()  # Load estimates on initialization
 
-    def load_estimates(self):
+    def load_estimates(self) -> None:
         """Load estimates from the database and display them in the table."""
         try:
             with Session(engine) as session:
@@ -174,7 +174,7 @@ class EstimateGUI(QMainWindow):
                 self, "Error", f"Failed to load estimates: {e!s}"
             )
 
-    def add_estimate(self):
+    def add_estimate(self) -> None:
         """Add a new estimate to the database."""
         dialog = EstimateDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -208,7 +208,7 @@ class EstimateGUI(QMainWindow):
                     self, "Error", f"Failed to add estimate: {e!s}"
                 )
 
-    def update_estimate(self):
+    def update_estimate(self) -> None:
         """Update an existing estimate."""
         selected_row = self.estimate_table.currentRow()
         if selected_row == -1:
@@ -263,7 +263,7 @@ class EstimateGUI(QMainWindow):
                     self, "Error", f"Failed to update estimate: {e!s}"
                 )
 
-    def delete_estimate(self):
+    def delete_estimate(self) -> None:
         """Delete an estimate from the database."""
         try:
             selected_row = self.estimate_table.currentRow()
