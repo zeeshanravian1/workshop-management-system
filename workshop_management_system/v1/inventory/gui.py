@@ -32,7 +32,7 @@ class InventoryGUI(QMainWindow):
 
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the Inventory GUI."""
         super().__init__()
         self.setWindowTitle("Inventory Management")
@@ -99,7 +99,7 @@ class InventoryGUI(QMainWindow):
 
                 for row, item in enumerate(inventory_items):
                     self.inventory_table.setItem(
-                        row, 0, QTableWidgetItem(str(item.id))
+                        row, 0, QTableWidgetItem(str(item.inventory_id))
                     )
                     self.inventory_table.setItem(
                         row, 1, QTableWidgetItem(item.item_name)

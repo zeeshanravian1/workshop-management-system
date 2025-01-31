@@ -7,8 +7,8 @@ Description:
 
 from collections.abc import Sequence
 from typing import Generic, TypeVar
-from uuid import UUID
 
+# from uuid import UUID
 from sqlmodel import Session, select, update
 
 from workshop_management_system.database.connection import Base
@@ -54,9 +54,7 @@ class BaseView(Generic[Model]):
 
         return record
 
-    def read_by_id(
-        self, db_session: Session, record_id: UUID | int
-    ) -> Model | None:
+    def read_by_id(self, db_session: Session, record_id: int) -> Model | None:
         """Retrieve a record by its ID.
 
         :Args:
@@ -82,13 +80,13 @@ class BaseView(Generic[Model]):
         return db_session.exec(select(self.model)).all()
 
     def update(
-        self, db_session: Session, record_id: UUID | int, record: Model
+        self, db_session: Session, record_id: int, record: Model
     ) -> Model | None:
         """Update a record by its ID.
 
         :Args:
         - `db_session` (Session): SQLModel database session. **(Required)**
-        - `record_id` (UUID | int): ID of record to update. **(Required)**
+        - `record_id` (int): ID of record to update. **(Required)**
         - `record` (Model): Model containing updated fields. **(Required)**
 
         :Returns:
@@ -104,9 +102,7 @@ class BaseView(Generic[Model]):
 
         return self.read_by_id(db_session=db_session, record_id=record_id)
 
-    def delete(
-        self, db_session: Session, record_id: UUID | int
-    ) -> Model | None:
+    def delete(self, db_session: Session, record_id: int) -> Model | None:
         """Delete a record by its ID.
 
         :Args:

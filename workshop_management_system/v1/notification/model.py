@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 class Notification(Base, table=True):
     """Notification Table."""
 
-    notification_id: int | None = Field(default=None, primary_key=True)
+    # notification_id: int | None = Field(default=None, primary_key=True)
     customer_id: int = Field(foreign_key="customer.id")
     message: str
     status: str = Field(max_length=50)
@@ -26,4 +26,4 @@ class Notification(Base, table=True):
         default_factory=datetime.utcnow, nullable=False
     )
 
-    customer: "Customer" = Relationship(back_populates="notifications")
+    # customer: "Customer" = Relationship(back_populates="notifications")

@@ -20,4 +20,4 @@ class DigitalSignature(Base, table=True):
     bucket_name: str = Field(max_length=255)  # Store MinIO bucket name
     object_name: str = Field(max_length=255)  # Store MinIO object name
 
-    customer: Customer = Relationship(back_populates="digital_signatures")
+    # customer: Customer = Relationship(back_populates="digital_signatures")

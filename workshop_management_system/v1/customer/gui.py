@@ -5,8 +5,6 @@ Description:
 
 """
 
-from uuid import UUID
-
 from PyQt6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -19,8 +17,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-# from sqlalchemy.orm import Session
 from sqlmodel import Session
 
 from workshop_management_system.database.connection import engine
@@ -36,7 +32,7 @@ class CustomerGUI(QMainWindow):
 
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the Customer GUI."""
         super().__init__()
         self.setWindowTitle("Customer Management")
@@ -91,7 +87,6 @@ class CustomerGUI(QMainWindow):
                 self.customer_table.setColumnCount(6)
                 self.customer_table.setHorizontalHeaderLabels(
                     [
-                        "ID",
                         "Name",
                         "Mobile",
                         "Email",
@@ -233,7 +228,7 @@ class CustomerGUI(QMainWindow):
 
             with Session(engine) as session:
                 customer_obj = self.customer_view.read_by_id(
-                    db_session=session, record_id=UUID(customer_id)
+                    db_session=session, record_id=int(customer_id)
                 )
                 if customer_obj:
                     customer_obj.name = name
@@ -243,7 +238,7 @@ class CustomerGUI(QMainWindow):
                     customer_obj.vehicle_registration_number = vehicle_reg
                     self.customer_view.update(
                         db_session=session,
-                        record_id=UUID(customer_id),
+                        record_id=int(customer_id),
                         record=customer_obj,
                     )
                     QMessageBox.information(
@@ -283,7 +278,7 @@ class CustomerGUI(QMainWindow):
             if confirmation == QMessageBox.StandardButton.Yes:
                 with Session(engine) as session:
                     self.customer_view.delete(
-                        db_session=session, record_id=UUID(customer_id)
+                        db_session=session, record_id=int(customer_id)
                     )
                     QMessageBox.information(
                         self, "Success", "Customer deleted successfully!"

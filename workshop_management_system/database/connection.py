@@ -6,8 +6,8 @@ Description:
 """
 
 from datetime import datetime
-from uuid import UUID, uuid4
 
+# from uuid import UUID, uuid4
 from sqlalchemy import Engine
 from sqlalchemy.sql.functions import now
 from sqlmodel import Field, MetaData, SQLModel, create_engine

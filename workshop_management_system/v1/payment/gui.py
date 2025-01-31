@@ -102,7 +102,7 @@ class PaymentGUI(QMainWindow):
 
                 for row, payment in enumerate(payments):
                     self.payment_table.setItem(
-                        row, 0, QTableWidgetItem(str(payment.id))
+                        row, 0, QTableWidgetItem(str(payment.payment_id))
                     )
                     self.payment_table.setItem(
                         row, 1, QTableWidgetItem(str(payment.customer_id))

@@ -12,10 +12,13 @@ from sqlmodel import Field, Relationship
 from workshop_management_system.database.connection import Base
 
 if TYPE_CHECKING:
-    from workshop_management_system.v1.customer.model import Customer
     from workshop_management_system.v1.employee.model import Employee
+    from workshop_management_system.v1.payment.model import Payment
     from workshop_management_system.v1.service.model import Service
     from workshop_management_system.v1.service_item.model import ServiceItem
+    from workshop_management_system.v1.stock_transaction.model import (
+        StockTransaction,
+    )
     from workshop_management_system.v1.vehicle.model import Vehicle
 
 
@@ -31,8 +34,9 @@ class JobCard(Base, table=True):
     supervisor_id: int = Field(foreign_key="employee.id")
     mechanic_id: int = Field(foreign_key="employee.id")
 
-    customer: "Customer" = Relationship(back_populates="job_cards")
+    # customer: "Customer" = Relationship(back_populates="job_cards")
     vehicle: "Vehicle" = Relationship(back_populates="job_cards")
+
     supervisor: "Employee" = Relationship(
         back_populates="supervised_jobs",
         sa_relationship_kwargs={"foreign_keys": "[JobCard.supervisor_id]"},
@@ -41,7 +45,12 @@ class JobCard(Base, table=True):
         back_populates="mechanic_jobs",
         sa_relationship_kwargs={"foreign_keys": "[JobCard.mechanic_id]"},
     )
+
     services: list["Service"] = Relationship(back_populates="job_card")
     service_items: list["ServiceItem"] = Relationship(
+        back_populates="job_card"
+    )
+    payments: list["Payment"] = Relationship(back_populates="job_card")
+    transactions: list["StockTransaction"] = Relationship(
         back_populates="job_card"
     )

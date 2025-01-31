@@ -2,12 +2,16 @@
 
 Description:
 - This module provides the GUI for managing services.
+
 """
 
 from PyQt6.QtWidgets import (
     QApplication,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QHBoxLayout,
-    QInputDialog,
+    QLineEdit,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -16,9 +20,10 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from workshop_management_system.database.connection import engine
+from workshop_management_system.v1.employee.model import Employee
 from workshop_management_system.v1.service.model import Service
 from workshop_management_system.v1.service.view import ServiceView
 
@@ -28,15 +33,18 @@ class ServiceGUI(QMainWindow):
 
     Description:
     - This class provides the GUI for managing services.
+
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the Service GUI."""
         super().__init__()
         self.setWindowTitle("Service Management")
         self.setGeometry(100, 100, 800, 600)
 
-        self.service_view = ServiceView(model=Service)
+        self.service_view = ServiceView(
+            model=Service
+        )  # Initialize ServiceView for CRUD operations
 
         self.main_layout = QVBoxLayout()
 
@@ -72,20 +80,32 @@ class ServiceGUI(QMainWindow):
         container.setLayout(self.main_layout)
         self.setCentralWidget(container)
 
-        self.load_services()
+        self.load_services()  # Load services on initialization
 
-    def load_services(self):
+    def load_services(self) -> None:
         """Load services from the database and display them in the table."""
         try:
             with Session(engine) as session:
                 services = self.service_view.read_all(db_session=session)
                 self.service_table.setRowCount(len(services))
-                self.service_table.setColumnCount(5)
+                self.service_table.setColumnCount(6)
                 self.service_table.setHorizontalHeaderLabels(
-                    ["ID", "Job Card ID", "Service Type", "Description", "Cost"]
+                    [
+                        "ID",
+                        "Job Card ID",
+                        "Employee Name",
+                        "Service Type",
+                        "Description",
+                        "Cost",
+                    ]
                 )
 
                 for row, service in enumerate(services):
+                    employee = session.exec(
+                        select(Employee).where(
+                            Employee.id == service.employee_id
+                        )
+                    ).first()
                     self.service_table.setItem(
                         row, 0, QTableWidgetItem(str(service.id))
                     )
@@ -93,60 +113,89 @@ class ServiceGUI(QMainWindow):
                         row, 1, QTableWidgetItem(str(service.job_card_id))
                     )
                     self.service_table.setItem(
-                        row, 2, QTableWidgetItem(service.service_type)
+                        row,
+                        2,
+                        QTableWidgetItem(employee.name if employee else ""),
                     )
                     self.service_table.setItem(
-                        row, 3, QTableWidgetItem(service.description)
+                        row, 3, QTableWidgetItem(service.service_type)
                     )
                     self.service_table.setItem(
-                        row, 4, QTableWidgetItem(str(service.cost))
+                        row, 4, QTableWidgetItem(service.description)
+                    )
+                    self.service_table.setItem(
+                        row, 5, QTableWidgetItem(str(service.cost))
                     )
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to load services: {e!s}")
+            QMessageBox.critical(
+                self, "Error", f"Failed to load services: {e!s}"
+            )
 
-    def add_service(self):
+    def add_service(self) -> None:
         """Add a new service to the database."""
         try:
-            job_card_id, ok = QInputDialog.getInt(
-                self, "Add Service", "Enter Job Card ID:", 1, 1
-            )
-            if not ok:
-                return
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Add Service")
+            layout = QFormLayout(dialog)
 
-            service_type, ok = QInputDialog.getText(
-                self, "Add Service", "Enter Service Type:"
-            )
-            if not ok or not service_type:
-                return
+            job_card_id_input = QLineEdit(dialog)
+            employee_name_input = QLineEdit(dialog)
+            service_type_input = QLineEdit(dialog)
+            description_input = QLineEdit(dialog)
+            cost_input = QLineEdit(dialog)
 
-            description, ok = QInputDialog.getText(
-                self, "Add Service", "Enter Description:"
-            )
-            if not ok or not description:
-                return
+            layout.addRow("Job Card ID:", job_card_id_input)
+            layout.addRow("Employee Name:", employee_name_input)
+            layout.addRow("Service Type:", service_type_input)
+            layout.addRow("Description:", description_input)
+            layout.addRow("Cost:", cost_input)
 
-            cost, ok = QInputDialog.getDouble(
-                self, "Add Service", "Enter Cost:", 0.0, 0.0, 1000000.0, 2
+            buttons = QDialogButtonBox(
+                QDialogButtonBox.StandardButton.Ok
+                | QDialogButtonBox.StandardButton.Cancel,
+                dialog,
             )
-            if not ok:
-                return
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
 
-            with Session(engine) as session:
-                new_service = Service(
-                    job_card_id=job_card_id,
-                    service_type=service_type,
-                    description=description,
-                    cost=cost,
-                )
-                self.service_view.create(db_session=session, record=new_service)
-                QMessageBox.information(
-                    self, "Success", "Service added successfully!"
-                )
-                self.load_services()
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                job_card_id = int(job_card_id_input.text())
+                employee_name = employee_name_input.text()
+                service_type = service_type_input.text()
+                description = description_input.text()
+                cost = float(cost_input.text())
+
+                with Session(engine) as session:
+                    employee = session.exec(
+                        select(Employee).where(Employee.name == employee_name)
+                    ).first()
+                    if not employee:
+                        QMessageBox.critical(
+                            self, "Error", "Employee not found."
+                        )
+                        return
+
+                    new_service = Service(
+                        job_card_id=job_card_id,
+                        employee_id=employee.id,
+                        service_type=service_type,
+                        description=description,
+                        cost=cost,
+                    )
+                    self.service_view.create(
+                        db_session=session, record=new_service
+                    )
+                    QMessageBox.information(
+                        self, "Success", "Service added successfully!"
+                    )
+                    self.load_services()
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to add service: {e!s}")
+            QMessageBox.critical(
+                self, "Error", f"Failed to add service: {e!s}"
+            )
 
-    def update_service(self):
+    def update_service(self) -> None:
         """Update an existing service."""
         try:
             selected_row = self.service_table.currentRow()
@@ -156,49 +205,82 @@ class ServiceGUI(QMainWindow):
                 )
                 return
 
-            service_id = int(self.service_table.item(selected_row, 0).text())
-
-            service_type, ok = QInputDialog.getText(
-                self, "Update Service", "Enter New Service Type:"
-            )
-            if not ok or not service_type:
-                return
-
-            description, ok = QInputDialog.getText(
-                self, "Update Service", "Enter New Description:"
-            )
-            if not ok or not description:
-                return
-
-            cost, ok = QInputDialog.getDouble(
-                self, "Update Service", "Enter New Cost:", 0.0, 0.0, 1000000.0, 2
-            )
-            if not ok:
-                return
-
-            with Session(engine) as session:
-                service_obj = self.service_view.read_by_id(
-                    db_session=session, record_id=service_id
+            item = self.service_table.item(selected_row, 0)
+            if item is None:
+                QMessageBox.warning(
+                    self, "Warning", "Selected service ID is invalid."
                 )
-                if service_obj:
-                    service_obj.service_type = service_type
-                    service_obj.description = description
-                    service_obj.cost = cost
-                    self.service_view.update(
-                        db_session=session,
-                        record_id=service_id,
-                        record=service_obj,
+                return
+            service_id = item.text()
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Update Service")
+            layout = QFormLayout(dialog)
+
+            job_card_id_input = QLineEdit(dialog)
+            employee_name_input = QLineEdit(dialog)
+            service_type_input = QLineEdit(dialog)
+            description_input = QLineEdit(dialog)
+            cost_input = QLineEdit(dialog)
+
+            layout.addRow("Job Card ID:", job_card_id_input)
+            layout.addRow("Employee Name:", employee_name_input)
+            layout.addRow("Service Type:", service_type_input)
+            layout.addRow("Description:", description_input)
+            layout.addRow("Cost:", cost_input)
+
+            buttons = QDialogButtonBox(
+                QDialogButtonBox.StandardButton.Ok
+                | QDialogButtonBox.StandardButton.Cancel,
+                dialog,
+            )
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                job_card_id = int(job_card_id_input.text())
+                employee_name = employee_name_input.text()
+                service_type = service_type_input.text()
+                description = description_input.text()
+                cost = float(cost_input.text())
+
+                with Session(engine) as session:
+                    service_obj = self.service_view.read_by_id(
+                        db_session=session, record_id=int(service_id)
                     )
-                    QMessageBox.information(
-                        self, "Success", "Service updated successfully!"
-                    )
-                    self.load_services()
+                    if service_obj:
+                        employee = session.exec(
+                            select(Employee).where(
+                                Employee.name == employee_name
+                            )
+                        ).first()
+                        if not employee:
+                            QMessageBox.critical(
+                                self, "Error", "Employee not found."
+                            )
+                            return
+
+                        service_obj.job_card_id = job_card_id
+                        service_obj.employee_id = employee.id
+                        service_obj.service_type = service_type
+                        service_obj.description = description
+                        service_obj.cost = cost
+                        self.service_view.update(
+                            db_session=session,
+                            record_id=int(service_id),
+                            record=service_obj,
+                        )
+                        QMessageBox.information(
+                            self, "Success", "Service updated successfully!"
+                        )
+                        self.load_services()
         except Exception as e:
             QMessageBox.critical(
                 self, "Error", f"Failed to update service: {e!s}"
             )
 
-    def delete_service(self):
+    def delete_service(self) -> None:
         """Delete a service from the database."""
         try:
             selected_row = self.service_table.currentRow()
@@ -208,7 +290,13 @@ class ServiceGUI(QMainWindow):
                 )
                 return
 
-            service_id = int(self.service_table.item(selected_row, 0).text())
+            item = self.service_table.item(selected_row, 0)
+            if item is None:
+                QMessageBox.warning(
+                    self, "Warning", "Selected service ID is invalid."
+                )
+                return
+            service_id = item.text()
 
             confirmation = QMessageBox.question(
                 self,
@@ -220,7 +308,7 @@ class ServiceGUI(QMainWindow):
             if confirmation == QMessageBox.StandardButton.Yes:
                 with Session(engine) as session:
                     self.service_view.delete(
-                        db_session=session, record_id=service_id
+                        db_session=session, record_id=int(service_id)
                     )
                     QMessageBox.information(
                         self, "Success", "Service deleted successfully!"
@@ -230,3 +318,10 @@ class ServiceGUI(QMainWindow):
             QMessageBox.critical(
                 self, "Error", f"Failed to delete service: {e!s}"
             )
+
+
+if __name__ == "__main__":
+    app = QApplication([])
+    window = ServiceGUI()
+    window.show()
+    app.exec()

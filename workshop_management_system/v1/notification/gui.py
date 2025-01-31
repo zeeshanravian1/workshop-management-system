@@ -86,7 +86,7 @@ class NotificationGUI(QMainWindow):
                     db_session=session
                 )
                 self.notification_table.setRowCount(len(notifications))
-                self.notification_table.setColumnCount(4)
+                self.notification_table.setColumnCount(5)
                 self.notification_table.setHorizontalHeaderLabels(
                     [
                         "ID",
@@ -99,7 +99,7 @@ class NotificationGUI(QMainWindow):
 
                 for row, notification in enumerate(notifications):
                     self.notification_table.setItem(
-                        row, 0, QTableWidgetItem(str(notification.id))
+                        row, 0, QTableWidgetItem(str(notification.notification_id))
                     )
                     self.notification_table.setItem(
                         row, 1, QTableWidgetItem(str(notification.customer_id))

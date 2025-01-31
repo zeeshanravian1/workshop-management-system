@@ -34,7 +34,7 @@ class JobCardGUI(QMainWindow):
 
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the JobCard GUI."""
         super().__init__()
         self.setWindowTitle("Job Card Management")
@@ -86,7 +86,7 @@ class JobCardGUI(QMainWindow):
             with Session(engine) as session:
                 jobcards = self.jobcard_view.read_all(db_session=session)
                 self.jobcard_table.setRowCount(len(jobcards))
-                self.jobcard_table.setColumnCount(7)
+                self.jobcard_table.setColumnCount(8)
                 self.jobcard_table.setHorizontalHeaderLabels(
                     [
                         "ID",
@@ -102,7 +102,7 @@ class JobCardGUI(QMainWindow):
 
                 for row, jobcard in enumerate(jobcards):
                     self.jobcard_table.setItem(
-                        row, 0, QTableWidgetItem(str(jobcard.id))
+                        row, 0, QTableWidgetItem(str(jobcard.jobcard_id))
                     )
                     self.jobcard_table.setItem(
                         row, 1, QTableWidgetItem(str(jobcard.customer_id))

@@ -5,6 +5,7 @@ Description:
 """
 
 from PyQt6.QtWidgets import (
+    QApplication,
     QHBoxLayout,
     QInputDialog,
     QMainWindow,
@@ -127,7 +128,13 @@ class ServiceItemGUI(QMainWindow):
         """Add a new service item to the database."""
         try:
             job_card_id, ok = QInputDialog.getInt(
-                self, "Add Service Item", "Enter Job Card ID:", 1, 1, 1000000, 1
+                self,
+                "Add Service Item",
+                "Enter Job Card ID:",
+                1,
+                1,
+                1000000,
+                1,
             )
             if not ok:
                 return
@@ -314,8 +321,6 @@ class ServiceItemGUI(QMainWindow):
 
 
 if __name__ == "__main__":
-    from PyQt6.QtWidgets import QApplication
-
     app = QApplication([])
     window = ServiceItemGUI()
     window.show()

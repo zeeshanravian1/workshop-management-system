@@ -5,13 +5,18 @@ Description:
 """
 
 from datetime import datetime
-from uuid import UUID
+from typing import TYPE_CHECKING, Optional
 
 from sqlmodel import Field, Relationship
 
 from workshop_management_system.database.connection import Base
-from workshop_management_system.v1.customer.model import Customer
-from workshop_management_system.v1.vehicle.model import Vehicle
+
+if TYPE_CHECKING:
+    from ..customer.model import Customer
+    from ..vehicle.model import Vehicle
+
+# from workshop_management_system.v1.customer.model import Customer
+# from workshop_management_system.v1.vehicle.model import Vehicle
 
 
 class Estimate(Base, table=True):
@@ -21,8 +26,8 @@ class Estimate(Base, table=True):
     total_estimate_amount: float = Field(default=0.0)
     status: str = Field(max_length=50)
     description: str | None = Field(max_length=255, default=None)
-    customer_id: UUID = Field(foreign_key="customer.id")
-    vehicle_id: UUID = Field(foreign_key="vehicle.id")
+    customer_id: int = Field(foreign_key="customer.id")
+    vehicle_id: int = Field(foreign_key="vehicle.id")
 
-    customer: Customer = Relationship(back_populates="estimates")
-    vehicle: Vehicle = Relationship(back_populates="estimates")
+    customer: Optional["Customer"] = Relationship(back_populates="estimates")
+    vehicle: Optional["Vehicle"] = Relationship(back_populates="estimates")

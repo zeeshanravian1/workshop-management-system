@@ -2,6 +2,7 @@
 
 Description:
 - This module provides the GUI for managing suppliers.
+
 """
 
 from PyQt6.QtWidgets import (
@@ -24,7 +25,12 @@ from workshop_management_system.v1.supplier.view import SupplierView
 
 
 class SupplierGUI(QMainWindow):
-    """Supplier GUI Class."""
+    """Supplier GUI Class.
+
+    Description:
+    - This class provides the GUI for managing suppliers.
+
+    """
 
     def __init__(self) -> None:
         """Initialize the Supplier GUI."""
@@ -32,7 +38,9 @@ class SupplierGUI(QMainWindow):
         self.setWindowTitle("Supplier Management")
         self.setGeometry(100, 100, 800, 600)
 
-        self.supplier_view = SupplierView(model=Supplier)
+        self.supplier_view = SupplierView(
+            model=Supplier
+        )  # Initialize SupplierView for CRUD operations
 
         self.main_layout = QVBoxLayout()
 
@@ -68,31 +76,25 @@ class SupplierGUI(QMainWindow):
         container.setLayout(self.main_layout)
         self.setCentralWidget(container)
 
-        self.load_suppliers()
+        self.load_suppliers()  # Load suppliers on initialization
 
     def load_suppliers(self) -> None:
-        """Load suppliers from database."""
+        """Load suppliers from the database and display them in the table."""
         try:
             with Session(engine) as session:
                 suppliers = self.supplier_view.read_all(db_session=session)
                 self.supplier_table.setRowCount(len(suppliers))
-                self.supplier_table.setColumnCount(4)
+                self.supplier_table.setColumnCount(2)
                 self.supplier_table.setHorizontalHeaderLabels(
-                    ["ID", "Name", "Contact Number", "Address"]
+                    ["ID", "Name"]
                 )
 
                 for row, supplier in enumerate(suppliers):
                     self.supplier_table.setItem(
-                        row, 0, QTableWidgetItem(str(supplier.id))
+                        row, 0, QTableWidgetItem(str(supplier.supplier_id))
                     )
                     self.supplier_table.setItem(
                         row, 1, QTableWidgetItem(supplier.name)
-                    )
-                    self.supplier_table.setItem(
-                        row, 2, QTableWidgetItem(supplier.contact_number)
-                    )
-                    self.supplier_table.setItem(
-                        row, 3, QTableWidgetItem(supplier.address)
                     )
         except Exception as e:
             QMessageBox.critical(
@@ -100,32 +102,17 @@ class SupplierGUI(QMainWindow):
             )
 
     def add_supplier(self) -> None:
-        """Add a new supplier."""
+        """Add a new supplier to the database."""
         try:
+            # Get supplier details from user
             name, ok = QInputDialog.getText(
                 self, "Add Supplier", "Enter Supplier Name:"
             )
             if not ok or not name:
                 return
 
-            contact, ok = QInputDialog.getText(
-                self, "Add Supplier", "Enter Contact Number:"
-            )
-            if not ok or not contact:
-                return
-
-            address, ok = QInputDialog.getText(
-                self, "Add Supplier", "Enter Address:"
-            )
-            if not ok or not address:
-                return
-
             with Session(engine) as session:
-                new_supplier = Supplier(
-                    name=name,
-                    contact_number=contact,
-                    address=address,
-                )
+                new_supplier = Supplier(name=name)
                 self.supplier_view.create(
                     db_session=session, record=new_supplier
                 )
@@ -148,38 +135,31 @@ class SupplierGUI(QMainWindow):
                 )
                 return
 
-            supplier_id = int(self.supplier_table.item(selected_row, 0).text())
+            item = self.supplier_table.item(selected_row, 0)
+            if item is None:
+                QMessageBox.warning(
+                    self, "Warning", "Selected supplier ID is invalid."
+                )
+                return
+            supplier_id = item.text()
 
+            # Get updated details from user
             name, ok = QInputDialog.getText(
                 self, "Update Supplier", "Enter New Name:"
             )
             if not ok or not name:
                 return
 
-            contact, ok = QInputDialog.getText(
-                self, "Update Supplier", "Enter New Contact Number:"
-            )
-            if not ok or not contact:
-                return
-
-            address, ok = QInputDialog.getText(
-                self, "Update Supplier", "Enter New Address:"
-            )
-            if not ok or not address:
-                return
-
             with Session(engine) as session:
-                supplier = self.supplier_view.read_by_id(
-                    db_session=session, record_id=supplier_id
+                supplier_obj = self.supplier_view.read_by_id(
+                    db_session=session, record_id=int(supplier_id)
                 )
-                if supplier:
-                    supplier.name = name
-                    supplier.contact_number = contact
-                    supplier.address = address
+                if supplier_obj:
+                    supplier_obj.name = name
                     self.supplier_view.update(
                         db_session=session,
-                        record_id=supplier_id,
-                        record=supplier,
+                        record_id=int(supplier_id),
+                        record=supplier_obj,
                     )
                     QMessageBox.information(
                         self, "Success", "Supplier updated successfully!"
@@ -191,7 +171,7 @@ class SupplierGUI(QMainWindow):
             )
 
     def delete_supplier(self) -> None:
-        """Delete a supplier."""
+        """Delete a supplier from the database."""
         try:
             selected_row = self.supplier_table.currentRow()
             if selected_row == -1:
@@ -200,7 +180,13 @@ class SupplierGUI(QMainWindow):
                 )
                 return
 
-            supplier_id = int(self.supplier_table.item(selected_row, 0).text())
+            item = self.supplier_table.item(selected_row, 0)
+            if item is None:
+                QMessageBox.warning(
+                    self, "Warning", "Selected supplier ID is invalid."
+                )
+                return
+            supplier_id = item.text()
 
             confirmation = QMessageBox.question(
                 self,
@@ -212,7 +198,7 @@ class SupplierGUI(QMainWindow):
             if confirmation == QMessageBox.StandardButton.Yes:
                 with Session(engine) as session:
                     self.supplier_view.delete(
-                        db_session=session, record_id=supplier_id
+                        db_session=session, record_id=int(supplier_id)
                     )
                     QMessageBox.information(
                         self, "Success", "Supplier deleted successfully!"
