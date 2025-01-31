@@ -29,4 +29,4 @@ class Customer(Base, table=True):
     vehicles: list["Vehicle"] = Relationship(back_populates="customer")
     estimates: list["Estimate"] = Relationship(back_populates="customer")
     feedbacks: list["FeedBack"] = Relationship(back_populates="customer")
-    # feedbacks: list["FeedBack"] = Relationship(back_populates="customer") 
+    # feedbacks: list["FeedBack"] = Relationship(back_populates="customer")

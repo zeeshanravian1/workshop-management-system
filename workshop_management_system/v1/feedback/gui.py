@@ -188,10 +188,11 @@ class FeedBackGUI(QMainWindow):
                         raise ValueError("Employee not found")
 
                     new_feedback = FeedBack(
+                        id=None,
                         description=data["description"],
                         status=data["status"],
                         customer_id=customer.id,
-                        employee_id=employee.id,
+                        employee_id=employee.id
                     )
                     self.feedback_view.create(
                         db_session=session, record=new_feedback
