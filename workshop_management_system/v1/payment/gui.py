@@ -18,7 +18,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMainWindow,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -107,21 +106,15 @@ class PaymentDialog(QDialog):
         }
 
 
-class PaymentGUI(QMainWindow):
-    """Payment GUI Class.
+class PaymentGUI(QWidget):
+    """Payment GUI Class."""
 
-    Description:
-    - This class provides the GUI for managing payments.
-
-    """
-
-    def __init__(self) -> None:
+    def __init__(self, parent=None) -> None:
         """Initialize the Payment GUI."""
-        super().__init__()
-        self.setWindowTitle("Payment Management")
-        self.setGeometry(100, 100, 800, 600)
+        super().__init__(parent)
+        self.parent_widget = parent
         self.setStyleSheet("""
-            QMainWindow {
+            QWidget {
                 background-color: #f0f0f0;
             }
             QPushButton {
@@ -135,6 +128,7 @@ class PaymentGUI(QMainWindow):
             }
             QPushButton:hover {
                 background-color: #45a049;
+                min-width: 125px;
             }
             QTableWidget {
                 background-color: white;
@@ -159,10 +153,8 @@ class PaymentGUI(QMainWindow):
 
         self.payment_view = PaymentView(model=Payment)
 
-        # Central widget and main layout
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
+        # Main layout
+        main_layout = QVBoxLayout(self)
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(20, 20, 20, 20)
 
@@ -173,6 +165,13 @@ class PaymentGUI(QMainWindow):
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title_label)
         main_layout.addLayout(header_layout)
+
+        # Back button
+        back_button = QPushButton("Back")
+        back_button.clicked.connect(self.back_to_home)
+        main_layout.addWidget(
+            back_button, alignment=Qt.AlignmentFlag.AlignLeft
+        )
 
         # Table Frame
         table_frame = QFrame()
@@ -224,6 +223,11 @@ class PaymentGUI(QMainWindow):
         main_layout.addWidget(button_frame)
 
         self.load_payments()
+
+    def back_to_home(self) -> None:
+        """Navigate back to the home page."""
+        if self.parent_widget:
+            self.parent_widget.back_to_home()
 
     def load_payments(self) -> None:
         """Load payments from the database and display them in the table."""

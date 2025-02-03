@@ -91,16 +91,15 @@ class CustomerComboBox(QComboBox):
         return None
 
 
-class ComplaintGUI(QMainWindow):
+class ComplaintGUI(QWidget):
     """Complaint GUI Class."""
 
-    def __init__(self) -> None:
+    def __init__(self, parent=None) -> None:
         """Initialize the Complaint GUI."""
-        super().__init__()
-        self.setWindowTitle("Complaint Management")
-        self.setGeometry(100, 100, 800, 600)
+        super().__init__(parent)
+        self.parent_widget = parent
         self.setStyleSheet("""
-            QMainWindow {
+            QWidget {
                 background-color: #f0f0f0;
             }
             QPushButton {
@@ -114,6 +113,7 @@ class ComplaintGUI(QMainWindow):
             }
             QPushButton:hover {
                 background-color: #45a049;
+                min-width: 125px;
             }
             QTableWidget {
                 background-color: white;
@@ -136,10 +136,8 @@ class ComplaintGUI(QMainWindow):
 
         self.complaint_view = ComplaintView(model=Complaint)
 
-        # Central widget and main layout
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
+        # Main layout
+        main_layout = QVBoxLayout(self)
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(20, 20, 20, 20)
 
@@ -150,6 +148,13 @@ class ComplaintGUI(QMainWindow):
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title_label)
         main_layout.addLayout(header_layout)
+
+        # Back button
+        back_button = QPushButton("Back")
+        back_button.clicked.connect(self.back_to_home)
+        main_layout.addWidget(
+            back_button, alignment=Qt.AlignmentFlag.AlignLeft
+        )
 
         # Table Frame
         table_frame = QFrame()
@@ -200,6 +205,11 @@ class ComplaintGUI(QMainWindow):
 
         main_layout.addWidget(button_frame)
         self.load_complaints()
+
+    def back_to_home(self) -> None:
+        """Navigate back to the home page."""
+        if self.parent_widget:
+            self.parent_widget.back_to_home()
 
     def create_input_dialog(
         self, title: str, complaint: Complaint | None = None

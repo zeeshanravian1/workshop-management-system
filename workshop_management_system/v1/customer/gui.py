@@ -5,15 +5,17 @@ Description:
 
 """
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import QRegularExpression, Qt
+from PyQt6.QtGui import QFont, QRegularExpressionValidator
 from PyQt6.QtWidgets import (
     QApplication,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QFrame,
     QHBoxLayout,
-    QInputDialog,
     QLabel,
-    QMainWindow,
+    QLineEdit,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -28,16 +30,109 @@ from workshop_management_system.v1.customer.model import Customer
 from workshop_management_system.v1.customer.view import CustomerView
 
 
-class CustomerGUI(QMainWindow):
+class CustomerDialog(QDialog):
+    """Dialog for adding/updating a customer."""
+
+    def __init__(self, parent=None) -> None:
+        """Initialize the Customer Dialog."""
+        super().__init__(parent)
+        self.setWindowTitle("Customer Details")
+        self.setMinimumWidth(400)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #f0f0f0;
+            }
+            QLineEdit {
+                padding: 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                min-width: 200px;
+            }
+            QFormLayout {
+                spacing: 15px;
+            }
+        """)
+
+        self.form_layout = QFormLayout(self)
+
+        # Create input fields
+        self.name_input = QLineEdit(self)
+        self.mobile_input = QLineEdit(self)
+        self.email_input = QLineEdit(self)
+        self.address_input = QLineEdit(self)
+
+        # Set validators
+        mobile_regex = QRegularExpression(r"^\+?\d{10,15}$")
+        self.mobile_input.setValidator(
+            QRegularExpressionValidator(mobile_regex, self)
+        )
+        email_regex = QRegularExpression(r"^[\w\.-]+@[\w\.-]+\.\w+$")
+        self.email_input.setValidator(
+            QRegularExpressionValidator(email_regex, self)
+        )
+
+        # Add fields to form
+        self.form_layout.addRow("Name:", self.name_input)
+        self.form_layout.addRow("Mobile:", self.mobile_input)
+        self.form_layout.addRow("Email:", self.email_input)
+        self.form_layout.addRow("Address:", self.address_input)
+
+        # Add OK and Cancel buttons
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel,
+            self,
+        )
+        self.buttons.accepted.connect(self.validate_and_accept)
+        self.buttons.rejected.connect(self.reject)
+        self.form_layout.addWidget(self.buttons)
+
+    def validate_and_accept(self):
+        """Validate inputs and accept the dialog if valid."""
+        if not self.name_input.text().strip():
+            QMessageBox.warning(self, "Invalid Input", "Name is required!")
+            return
+        if not self.mobile_input.hasAcceptableInput():
+            QMessageBox.warning(
+                self, "Invalid Input", "Invalid mobile number!"
+            )
+            return
+        if not self.email_input.hasAcceptableInput():
+            QMessageBox.warning(
+                self, "Invalid Input", "Invalid email address!"
+            )
+            return
+        if not self.address_input.text().strip():
+            QMessageBox.warning(self, "Invalid Input", "Address is required!")
+            return
+        self.accept()
+
+    def set_data(self, customer_data: dict) -> None:
+        """Set the dialog's fields with existing customer data."""
+        self.name_input.setText(customer_data.get("name", ""))
+        self.mobile_input.setText(customer_data.get("mobile_number", ""))
+        self.email_input.setText(customer_data.get("email", ""))
+        self.address_input.setText(customer_data.get("address", ""))
+
+    def get_data(self) -> dict:
+        """Get the data from the dialog."""
+        return {
+            "name": self.name_input.text().strip(),
+            "mobile_number": self.mobile_input.text().strip(),
+            "email": self.email_input.text().strip(),
+            "address": self.address_input.text().strip(),
+        }
+
+
+class CustomerGUI(QWidget):
     """Customer GUI Class."""
 
-    def __init__(self) -> None:
+    def __init__(self, parent=None) -> None:
         """Initialize the Customer GUI."""
-        super().__init__()
-        self.setWindowTitle("Customer Management")
-        self.setGeometry(100, 100, 800, 600)
+        super().__init__(parent)
+        self.parent_widget = parent
         self.setStyleSheet("""
-            QMainWindow {
+            QWidget {
                 background-color: #f0f0f0;
             }
             QPushButton {
@@ -51,6 +146,7 @@ class CustomerGUI(QMainWindow):
             }
             QPushButton:hover {
                 background-color: #45a049;
+                min-width: 125px;
             }
             QTableWidget {
                 background-color: white;
@@ -59,6 +155,7 @@ class CustomerGUI(QMainWindow):
             }
             QTableWidget::item {
                 padding: 5px;
+                color: black;
                 background-color: white;
             }
             QLabel {
@@ -68,10 +165,8 @@ class CustomerGUI(QMainWindow):
 
         self.customer_view = CustomerView(model=Customer)
 
-        # Central widget and main layout
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
+        # Main layout
+        main_layout = QVBoxLayout(self)
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(20, 20, 20, 20)
 
@@ -82,6 +177,13 @@ class CustomerGUI(QMainWindow):
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title_label)
         main_layout.addLayout(header_layout)
+
+        # Back button
+        back_button = QPushButton("Back")
+        back_button.clicked.connect(self.back_to_home)
+        main_layout.addWidget(
+            back_button, alignment=Qt.AlignmentFlag.AlignLeft
+        )
 
         # Table Frame
         table_frame = QFrame()
@@ -134,6 +236,11 @@ class CustomerGUI(QMainWindow):
 
         self.load_customers()
 
+    def back_to_home(self) -> None:
+        """Navigate back to the home page."""
+        if self.parent_widget:
+            self.parent_widget.back_to_home()
+
     def load_customers(self) -> None:
         """Load customers from the database."""
         try:
@@ -174,45 +281,26 @@ class CustomerGUI(QMainWindow):
     def add_customer(self) -> None:
         """Add a new customer to the database."""
         try:
-            # Get customer details from user
-            name, ok = QInputDialog.getText(
-                self, "Add Customer", "Enter Customer Name:"
-            )
-            if not ok or not name:
-                return
+            dialog = CustomerDialog(self)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                data = dialog.get_data()
 
-            mobile, ok = QInputDialog.getText(
-                self, "Add Customer", "Enter Mobile Number:"
-            )
-            if not ok or not mobile:
-                return
+                # Validate inputs
+                if not all(data.values()):
+                    QMessageBox.warning(
+                        self, "Invalid Input", "All fields are required!"
+                    )
+                    return
 
-            email, ok = QInputDialog.getText(
-                self, "Add Customer", "Enter Email Address:"
-            )
-            if not ok or not email:
-                return
-
-            address, ok = QInputDialog.getText(
-                self, "Add Customer", "Enter Address:"
-            )
-            if not ok or not address:
-                return
-
-            with Session(engine) as session:
-                new_customer = Customer(
-                    name=name,
-                    mobile_number=mobile,
-                    email=email,
-                    address=address,
-                )
-                self.customer_view.create(
-                    db_session=session, record=new_customer
-                )
-                QMessageBox.information(
-                    self, "Success", "Customer added successfully!"
-                )
-                self.load_customers()
+                with Session(engine) as session:
+                    new_customer = Customer(**data)
+                    self.customer_view.create(
+                        db_session=session, record=new_customer
+                    )
+                    QMessageBox.information(
+                        self, "Success", "Customer added successfully!"
+                    )
+                    self.load_customers()
         except Exception as e:
             QMessageBox.critical(
                 self, "Error", f"Failed to add customer: {e!s}"
@@ -234,41 +322,48 @@ class CustomerGUI(QMainWindow):
                     self, "Warning", "Selected customer ID is invalid."
                 )
                 return
+
             customer_id = int(item.text())
 
-            # Get updated details
-            fields = {
-                "Name": "name",
-                "Mobile Number": "mobile_number",
-                "Email": "email",
-                "Address": "address",
+            # Get current values
+            current_data = {
+                "name": self.customer_table.item(selected_row, 1).text(),
+                "mobile_number": self.customer_table.item(
+                    selected_row, 2
+                ).text(),
+                "email": self.customer_table.item(selected_row, 3).text(),
+                "address": self.customer_table.item(selected_row, 4).text(),
             }
 
-            new_values = {}
-            for label, field in fields.items():
-                value, ok = QInputDialog.getText(
-                    self, "Update Customer", f"Enter New {label}:"
-                )
-                if not ok:
-                    return
-                new_values[field] = value
+            dialog = CustomerDialog(self)
+            dialog.set_data(current_data)
 
-            with Session(engine) as session:
-                customer = self.customer_view.read_by_id(
-                    db_session=session, record_id=customer_id
-                )
-                if customer:
-                    for field, value in new_values.items():
-                        setattr(customer, field, value)
-                    self.customer_view.update(
-                        db_session=session,
-                        record_id=customer_id,
-                        record=customer,
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                data = dialog.get_data()
+
+                # Validate inputs
+                if not all(data.values()):
+                    QMessageBox.warning(
+                        self, "Invalid Input", "All fields are required!"
                     )
-                    QMessageBox.information(
-                        self, "Success", "Customer updated successfully!"
+                    return
+
+                with Session(engine) as session:
+                    customer = self.customer_view.read_by_id(
+                        db_session=session, record_id=customer_id
                     )
-                    self.load_customers()
+                    if customer:
+                        for field, value in data.items():
+                            setattr(customer, field, value)
+                        self.customer_view.update(
+                            db_session=session,
+                            record_id=customer_id,
+                            record=customer,
+                        )
+                        QMessageBox.information(
+                            self, "Success", "Customer updated successfully!"
+                        )
+                        self.load_customers()
         except Exception as e:
             QMessageBox.critical(
                 self, "Error", f"Failed to update customer: {e!s}"

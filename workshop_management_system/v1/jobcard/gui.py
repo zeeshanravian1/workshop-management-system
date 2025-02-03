@@ -91,21 +91,15 @@ class JobCardDialog(QDialog):
         }
 
 
-class JobCardGUI(QMainWindow):
-    """JobCard GUI Class.
+class JobCardGUI(QWidget):
+    """JobCard GUI Class."""
 
-    Description:
-    - This class provides the GUI for managing job cards.
-
-    """
-
-    def __init__(self) -> None:
+    def __init__(self, parent=None) -> None:
         """Initialize the JobCard GUI."""
-        super().__init__()
-        self.setWindowTitle("Job Card Management")
-        self.setGeometry(100, 100, 800, 600)
+        super().__init__(parent)
+        self.parent_widget = parent
         self.setStyleSheet("""
-            QMainWindow {
+            QWidget {
                 background-color: #f0f0f0;
             }
             QPushButton {
@@ -119,6 +113,7 @@ class JobCardGUI(QMainWindow):
             }
             QPushButton:hover {
                 background-color: #45a049;
+                min-width: 125px;
             }
             QTableWidget {
                 background-color: white;
@@ -143,10 +138,8 @@ class JobCardGUI(QMainWindow):
 
         self.jobcard_view = JobCardView(model=JobCard)
 
-        # Central widget and main layout
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
+        # Main layout
+        main_layout = QVBoxLayout(self)
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(20, 20, 20, 20)
 
@@ -157,6 +150,13 @@ class JobCardGUI(QMainWindow):
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title_label)
         main_layout.addLayout(header_layout)
+
+        # Back button
+        back_button = QPushButton("Back")
+        back_button.clicked.connect(self.back_to_home)
+        main_layout.addWidget(
+            back_button, alignment=Qt.AlignmentFlag.AlignLeft
+        )
 
         # Table Frame
         table_frame = QFrame()
@@ -208,6 +208,11 @@ class JobCardGUI(QMainWindow):
         main_layout.addWidget(button_frame)
 
         self.load_jobcards()
+
+    def back_to_home(self) -> None:
+        """Navigate back to the home page."""
+        if self.parent_widget:
+            self.parent_widget.back_to_home()
 
     def load_jobcards(self) -> None:
         """Load job cards from the database and display them in the table."""

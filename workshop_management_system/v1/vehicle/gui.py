@@ -104,16 +104,15 @@ class CustomerComboBox(QComboBox):
             self.setCurrentIndex(-1)
 
 
-class VehicleGUI(QMainWindow):
+class VehicleGUI(QWidget):
     """Vehicle GUI Class."""
 
-    def __init__(self) -> None:
+    def __init__(self, parent=None) -> None:
         """Initialize the Vehicle GUI."""
-        super().__init__()
-        self.setWindowTitle("Vehicle Management")
-        self.setGeometry(100, 100, 800, 600)
+        super().__init__(parent)
+        self.parent_widget = parent
         self.setStyleSheet("""
-            QMainWindow {
+            QWidget {
                 background-color: #f0f0f0;
             }
             QPushButton {
@@ -127,6 +126,7 @@ class VehicleGUI(QMainWindow):
             }
             QPushButton:hover {
                 background-color: #45a049;
+                min-width: 125px;
             }
             QTableWidget {
                 background-color: white;
@@ -151,10 +151,8 @@ class VehicleGUI(QMainWindow):
 
         self.vehicle_view = VehicleView(model=Vehicle)
 
-        # Central widget and main layout
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
+        # Main layout
+        main_layout = QVBoxLayout(self)
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(20, 20, 20, 20)
 
@@ -165,6 +163,13 @@ class VehicleGUI(QMainWindow):
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title_label)
         main_layout.addLayout(header_layout)
+
+        # Back button
+        back_button = QPushButton("Back")
+        back_button.clicked.connect(self.back_to_home)
+        main_layout.addWidget(
+            back_button, alignment=Qt.AlignmentFlag.AlignLeft
+        )
 
         # Table Frame
         table_frame = QFrame()
@@ -216,6 +221,11 @@ class VehicleGUI(QMainWindow):
         main_layout.addWidget(button_frame)
 
         self.load_vehicles()
+
+    def back_to_home(self) -> None:
+        """Navigate back to the home page."""
+        if self.parent_widget:
+            self.parent_widget.back_to_home()
 
     def load_vehicles(self) -> None:
         """Load vehicles from the database and display them in the table."""
@@ -460,6 +470,11 @@ class VehicleGUI(QMainWindow):
             QMessageBox.critical(
                 self, "Error", f"Failed to delete vehicle: {e!s}"
             )
+
+    def go_back(self) -> None:
+        """Navigate back to the home page."""
+        if self.parent_widget:
+            self.parent_widget.setCurrentIndex(0)
 
 
 if __name__ == "__main__":

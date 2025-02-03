@@ -106,9 +106,9 @@ class InventoryGUI(QMainWindow):
 
     """
 
-    def __init__(self) -> None:
+    def __init__(self, parent=None) -> None:
         """Initialize the Inventory GUI."""
-        super().__init__()
+        super().__init__(parent)
         self.setWindowTitle("Inventory Management")
         self.setGeometry(100, 100, 800, 600)
         self.setStyleSheet("""
@@ -165,6 +165,13 @@ class InventoryGUI(QMainWindow):
         header_layout.addWidget(title_label)
         main_layout.addLayout(header_layout)
 
+        # Back button
+        back_button = QPushButton("Back")
+        back_button.clicked.connect(self.back_to_home)
+        main_layout.addWidget(
+            back_button, alignment=Qt.AlignmentFlag.AlignLeft
+        )
+
         # Table Frame
         table_frame = QFrame()
         table_frame.setFrameShape(QFrame.Shape.StyledPanel)
@@ -215,6 +222,11 @@ class InventoryGUI(QMainWindow):
         main_layout.addWidget(button_frame)
 
         self.load_inventory()
+
+    def back_to_home(self) -> None:
+        """Navigate back to the home page."""
+        if self.parent():
+            self.parent().back_to_home()
 
     def load_inventory(self) -> None:
         """Load inventory from the database and display them in the table."""

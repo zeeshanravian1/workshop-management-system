@@ -58,6 +58,7 @@ class HomeGUI(QMainWindow):
             }
             QPushButton:hover {
                 background-color: #45a049;
+                margin: 0px;
             }
             QLabel {
                 color: #333;
@@ -65,19 +66,30 @@ class HomeGUI(QMainWindow):
         """)
 
         # Central widget and main layout
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setSpacing(20)
-        main_layout.setContentsMargins(20, 20, 20, 20)
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.main_layout = QVBoxLayout(self.central_widget)
+        self.main_layout.setSpacing(20)
+        self.main_layout.setContentsMargins(20, 20, 20, 20)
 
+        self.create_home_page()
+
+    def create_home_page(self) -> None:
+        """Create the home page layout."""
+        # Clear the main layout
+        for i in reversed(range(self.main_layout.count())):
+            item = self.main_layout.itemAt(i)
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
         # Header
         header_layout = QHBoxLayout()
         welcome_label = QLabel("Workshop Management System")
         welcome_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
         welcome_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(welcome_label)
-        main_layout.addLayout(header_layout)
+        self.main_layout.addLayout(header_layout)
 
         # Description
         description_label = QLabel(
@@ -85,7 +97,7 @@ class HomeGUI(QMainWindow):
         )
         description_label.setFont(QFont("Arial", 12))
         description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(description_label)
+        self.main_layout.addWidget(description_label)
 
         # Button container
         button_frame = QFrame()
@@ -120,47 +132,56 @@ class HomeGUI(QMainWindow):
             col = index % 2
             button_layout.addWidget(button, row, col)
 
-        main_layout.addWidget(button_frame)
+        self.main_layout.addWidget(button_frame)
 
     def open_customer_gui(self) -> None:
         """Open the Customer Management GUI."""
-        self.customer_window = CustomerGUI()
-        self.customer_window.show()
+        self.customer_window = CustomerGUI(self)
+        self.setCentralWidget(self.customer_window)
 
     def open_vehicle_gui(self) -> None:
         """Open the Vehicle Management GUI."""
-        self.vehicle_window = VehicleGUI()
-        self.vehicle_window.show()
+        self.vehicle_window = VehicleGUI(self)
+        self.setCentralWidget(self.vehicle_window)
 
     def open_job_card_gui(self) -> None:
         """Open the Job Card Management GUI."""
-        self.jobcard_window = JobCardGUI()
-        self.jobcard_window.show()
+        self.jobcard_window = JobCardGUI(self)
+        self.setCentralWidget(self.jobcard_window)
 
     def open_estimate_gui(self) -> None:
         """Open the Estimate Management GUI."""
-        self.estimate_window = EstimateGUI()
-        self.estimate_window.show()
+        self.estimate_window = EstimateGUI(self)
+        self.setCentralWidget(self.estimate_window)
 
     def open_payment_gui(self) -> None:
         """Open the Payment Management GUI."""
-        self.payment_window = PaymentGUI()
-        self.payment_window.show()
+        self.payment_window = PaymentGUI(self)
+        self.setCentralWidget(self.payment_window)
 
     def open_inventory_gui(self) -> None:
         """Open the Inventory Management GUI."""
-        self.inventory_window = InventoryGUI()
-        self.inventory_window.show()
+        self.inventory_window = InventoryGUI(self)
+        self.setCentralWidget(self.inventory_window)
 
     def open_supplier_gui(self) -> None:
         """Open the Supplier Management GUI."""
-        self.supplier_window = SupplierGUI()
-        self.supplier_window.show()
+        self.supplier_window = SupplierGUI(self)
+        self.setCentralWidget(self.supplier_window)
 
     def open_complaint_gui(self) -> None:
         """Open the Complaint Management GUI."""
-        self.complaint_window = ComplaintGUI()
-        self.complaint_window.show()
+        self.complaint_window = ComplaintGUI(self)
+        self.setCentralWidget(self.complaint_window)
+
+    def back_to_home(self) -> None:
+        """Navigate back to the home page."""
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.main_layout = QVBoxLayout(self.central_widget)
+        self.main_layout.setSpacing(20)
+        self.main_layout.setContentsMargins(20, 20, 20, 20)
+        self.create_home_page()
 
 
 if __name__ == "__main__":

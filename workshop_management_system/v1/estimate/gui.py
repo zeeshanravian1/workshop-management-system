@@ -8,7 +8,7 @@ Description:
 from datetime import datetime
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QAction, QFont
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QToolBar,
     QVBoxLayout,
     QWidget,
 )
@@ -106,21 +107,15 @@ class EstimateDialog(QDialog):
         }
 
 
-class EstimateGUI(QMainWindow):
-    """Estimate GUI Class.
+class EstimateGUI(QWidget):
+    """Estimate GUI Class."""
 
-    Description:
-    - This class provides the GUI for managing estimates.
-
-    """
-
-    def __init__(self) -> None:
+    def __init__(self, parent=None) -> None:
         """Initialize the Estimate GUI."""
-        super().__init__()
-        self.setWindowTitle("Estimate Management")
-        self.setGeometry(100, 100, 800, 600)
+        super().__init__(parent)
+        self.parent_widget = parent
         self.setStyleSheet("""
-            QMainWindow {
+            QWidget {
                 background-color: #f0f0f0;
             }
             QPushButton {
@@ -134,6 +129,7 @@ class EstimateGUI(QMainWindow):
             }
             QPushButton:hover {
                 background-color: #45a049;
+                min-width: 125px;
             }
             QTableWidget {
                 background-color: white;
@@ -158,10 +154,8 @@ class EstimateGUI(QMainWindow):
 
         self.estimate_view = EstimateView(model=Estimate)
 
-        # Central widget and main layout
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
+        # Main layout
+        main_layout = QVBoxLayout(self)
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(20, 20, 20, 20)
 
@@ -172,6 +166,13 @@ class EstimateGUI(QMainWindow):
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title_label)
         main_layout.addLayout(header_layout)
+
+        # Back button
+        back_button = QPushButton("Back")
+        back_button.clicked.connect(self.back_to_home)
+        main_layout.addWidget(
+            back_button, alignment=Qt.AlignmentFlag.AlignLeft
+        )
 
         # Table Frame
         table_frame = QFrame()
@@ -223,6 +224,11 @@ class EstimateGUI(QMainWindow):
         main_layout.addWidget(button_frame)
 
         self.load_estimates()
+
+    def back_to_home(self) -> None:
+        """Navigate back to the home page."""
+        if self.parent_widget:
+            self.parent_widget.back_to_home()
 
     def load_estimates(self) -> None:
         """Load estimates from the database and display them in the table."""
