@@ -115,21 +115,15 @@ class InventoryDialog(QDialog):
         }
 
 
-class InventoryGUI(QMainWindow):
-    """Inventory GUI Class.
-
-    Description:
-    - This class provides the GUI for managing inventory.
-
-    """
+class InventoryGUI(QWidget):
+    """Inventory GUI Class."""
 
     def __init__(self, parent=None) -> None:
         """Initialize the Inventory GUI."""
         super().__init__(parent)
-        self.setWindowTitle("Inventory Management")
-        self.setGeometry(100, 100, 800, 600)
+        self.parent_widget = parent
         self.setStyleSheet("""
-            QMainWindow {
+            QWidget {
                 background-color: #f0f0f0;
             }
             QPushButton {
@@ -167,10 +161,8 @@ class InventoryGUI(QMainWindow):
 
         self.inventory_view = InventoryView(model=Inventory)
 
-        # Central widget and main layout
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
+        # Main layout
+        main_layout = QVBoxLayout(self)
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(20, 20, 20, 20)
 
@@ -242,8 +234,8 @@ class InventoryGUI(QMainWindow):
 
     def back_to_home(self) -> None:
         """Navigate back to the home page."""
-        if self.parent():
-            self.parent().back_to_home()
+        if self.parent_widget:
+            self.parent_widget.back_to_home()
 
     def load_inventory(self) -> None:
         """Load inventory from the database and display them in the table."""
