@@ -59,6 +59,7 @@ class JobCardDialog(QDialog):
 
         self.vehicle_id_input = QLineEdit(self)
         self.service_date_input = QLineEdit(self)
+        self.service_date_input.setText(datetime.now().strftime("%Y-%m-%d"))  # Auto-fill current date
         self.status_input = QLineEdit(self)
         self.total_amount_input = QLineEdit(self)
         self.description_input = QLineEdit(self)

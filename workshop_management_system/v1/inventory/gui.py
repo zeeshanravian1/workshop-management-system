@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QApplication,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -62,7 +63,8 @@ class InventoryDialog(QDialog):
         self.minimum_stock_level_input = QLineEdit(self)
         self.category_input = QLineEdit(self)
         self.reorder_level_input = QLineEdit(self)
-        self.supplier_id_input = QLineEdit(self)
+        self.supplier_id_input = QComboBox(self)
+        self.load_suppliers()
 
         self.form_layout.addRow("Item Name:", self.item_name_input)
         self.form_layout.addRow("Quantity:", self.quantity_input)
@@ -72,7 +74,7 @@ class InventoryDialog(QDialog):
         )
         self.form_layout.addRow("Category:", self.category_input)
         self.form_layout.addRow("Reorder Level:", self.reorder_level_input)
-        self.form_layout.addRow("Supplier ID:", self.supplier_id_input)
+        self.form_layout.addRow("Supplier:", self.supplier_id_input)
 
         self.buttons = QDialogButtonBox(
             (
@@ -85,6 +87,21 @@ class InventoryDialog(QDialog):
         self.buttons.rejected.connect(self.reject)
         self.form_layout.addWidget(self.buttons)
 
+    def load_suppliers(self):
+        """Load suppliers into the dropdown."""
+        try:
+            with Session(engine) as session:
+                suppliers = session.exec(select(Supplier)).all()
+                for supplier in suppliers:
+                    self.supplier_id_input.addItem(
+                        f"{supplier.name} ({supplier.contact_number})",
+                        supplier.id,
+                    )
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Error", f"Failed to load suppliers: {e!s}"
+            )
+
     def get_data(self):
         """Get the data from the dialog."""
         return {
@@ -94,7 +111,7 @@ class InventoryDialog(QDialog):
             "minimum_stock_level": int(self.minimum_stock_level_input.text()),
             "category": self.category_input.text(),
             "reorder_level": int(self.reorder_level_input.text()),
-            "supplier_id": int(self.supplier_id_input.text()),
+            "supplier_id": self.supplier_id_input.currentData(),
         }
 
 
