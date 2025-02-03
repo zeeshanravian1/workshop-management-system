@@ -66,8 +66,8 @@ class SupplierDialog(QDialog):
         self.form_layout.addRow("Address:", self.address_input)
 
         self.buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok |
-            QDialogButtonBox.StandardButton.Cancel,
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel,
             self,
         )
         self.buttons.accepted.connect(self.accept)
@@ -292,7 +292,7 @@ class SupplierGUI(QMainWindow):
                         self.supplier_view.update(
                             db_session=session,
                             record_id=int(supplier_id),
-                            record=supplier_obj
+                            record=supplier_obj,
                         )
                         QMessageBox.information(
                             self, "Success", "Supplier updated successfully!"

@@ -348,8 +348,7 @@ class VehicleGUI(QMainWindow):
                         customer_id=customer_id,
                     )
                     self.vehicle_view.create(
-                        db_session=session, 
-                        record=new_vehicle
+                        db_session=session, record=new_vehicle
                     )
                     QMessageBox.information(
                         self, "Success", "Vehicle added successfully!"
@@ -402,7 +401,9 @@ class VehicleGUI(QMainWindow):
                     vehicle_obj.make = inputs["make"].text()
                     vehicle_obj.model = inputs["model"].text()
                     vehicle_obj.year = int(inputs["year"].text())
-                    vehicle_obj.chassis_number = inputs["chassis_number"].text()
+                    vehicle_obj.chassis_number = inputs[
+                        "chassis_number"
+                    ].text()
                     vehicle_obj.engine_number = inputs["engine_number"].text()
                     vehicle_obj.customer_id = customer_id
 

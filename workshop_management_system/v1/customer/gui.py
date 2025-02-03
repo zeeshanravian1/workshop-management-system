@@ -59,6 +59,7 @@ class CustomerGUI(QMainWindow):
             }
             QTableWidget::item {
                 padding: 5px;
+                background-color: white;
             }
             QLabel {
                 color: #333;

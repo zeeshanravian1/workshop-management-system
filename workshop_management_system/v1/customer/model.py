@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 class Customer(Base, table=True):
     """Customer Table."""
 
-    name: str = Field(max_length=2_55)
+    name: str = Field(max_length=255)
     mobile_number: str = Field(max_length=20)
     email: str = Field(max_length=255)
     address: str

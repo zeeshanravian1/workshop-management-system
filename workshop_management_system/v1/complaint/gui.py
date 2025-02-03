@@ -74,7 +74,8 @@ class CustomerComboBox(QComboBox):
                     display_text = (
                         f"<b>{customer.name}</b> "
                         f"<font color='#666666'>{
-                            customer.mobile_number}</font>"
+                            customer.mobile_number
+                        }</font>"
                     )
                     self.addItem(display_text)
         except Exception as e:

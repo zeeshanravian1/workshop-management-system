@@ -68,16 +68,17 @@ class InventoryDialog(QDialog):
         self.form_layout.addRow("Quantity:", self.quantity_input)
         self.form_layout.addRow("Unit Price:", self.unit_price_input)
         self.form_layout.addRow(
-            "Minimum Stock Level:",
-            self.minimum_stock_level_input
+            "Minimum Stock Level:", self.minimum_stock_level_input
         )
         self.form_layout.addRow("Category:", self.category_input)
         self.form_layout.addRow("Reorder Level:", self.reorder_level_input)
         self.form_layout.addRow("Supplier ID:", self.supplier_id_input)
 
         self.buttons = QDialogButtonBox(
-            (QDialogButtonBox.StandardButton.Ok |
-             QDialogButtonBox.StandardButton.Cancel),
+            (
+                QDialogButtonBox.StandardButton.Ok
+                | QDialogButtonBox.StandardButton.Cancel
+            ),
             self,
         )
         self.buttons.accepted.connect(self.accept)
@@ -179,7 +180,8 @@ class InventoryGUI(QMainWindow):
         # Inventory table
         self.inventory_table = QTableWidget()
         self.inventory_table.setSelectionBehavior(
-            QTableWidget.SelectionBehavior.SelectRows)
+            QTableWidget.SelectionBehavior.SelectRows
+        )
         self.inventory_table.setAlternatingRowColors(True)
         table_layout.addWidget(self.inventory_table)
         main_layout.addWidget(table_frame)
@@ -240,18 +242,23 @@ class InventoryGUI(QMainWindow):
                         row, 0, QTableWidgetItem(str(item.id))
                     )
                     self.inventory_table.setItem(
-                        row, 1, QTableWidgetItem(item.item_name))
+                        row, 1, QTableWidgetItem(item.item_name)
+                    )
                     self.inventory_table.setItem(
-                        row, 2, QTableWidgetItem(str(item.quantity)))
+                        row, 2, QTableWidgetItem(str(item.quantity))
+                    )
                     self.inventory_table.setItem(
-                        row, 3, QTableWidgetItem(str(item.unit_price)))
+                        row, 3, QTableWidgetItem(str(item.unit_price))
+                    )
                     self.inventory_table.setItem(
-                        row, 4,
-                        QTableWidgetItem(str(item.minimum_stock_level)))
+                        row, 4, QTableWidgetItem(str(item.minimum_stock_level))
+                    )
                     self.inventory_table.setItem(
-                        row, 5, QTableWidgetItem(item.category))
+                        row, 5, QTableWidgetItem(item.category)
+                    )
                     self.inventory_table.setItem(
-                        row, 6, QTableWidgetItem(str(item.supplier_id)))
+                        row, 6, QTableWidgetItem(str(item.supplier_id))
+                    )
         except Exception as e:
             QMessageBox.critical(
                 self, "Error", f"Failed to load inventory: {e!s}"
@@ -265,7 +272,8 @@ class InventoryGUI(QMainWindow):
             try:
                 with Session(engine) as session:
                     supplier_query = select(Supplier).where(
-                        Supplier.id == data["supplier_id"])
+                        Supplier.id == data["supplier_id"]
+                    )
                     supplier = session.exec(supplier_query).first()
                     if not supplier:
                         raise ValueError("Supplier not found")
@@ -280,8 +288,7 @@ class InventoryGUI(QMainWindow):
                         supplier_id=data["supplier_id"],
                     )
                     self.inventory_view.create(
-                        db_session=session,
-                        record=new_item
+                        db_session=session, record=new_item
                     )
                     QMessageBox.information(
                         self, "Success", "Item added successfully!"
@@ -289,7 +296,8 @@ class InventoryGUI(QMainWindow):
                     self.load_inventory()
             except Exception as e:
                 QMessageBox.critical(
-                    self, "Error", f"Failed to add item: {e!s}")
+                    self, "Error", f"Failed to add item: {e!s}"
+                )
 
     def update_item(self) -> None:
         """Update an existing item."""
@@ -303,7 +311,8 @@ class InventoryGUI(QMainWindow):
         item = self.inventory_table.item(selected_row, 0)
         if item is None:
             QMessageBox.warning(
-                self, "Warning", "Selected item ID is invalid.")
+                self, "Warning", "Selected item ID is invalid."
+            )
             return
         item_id = item.text()
 
@@ -327,15 +336,16 @@ class InventoryGUI(QMainWindow):
                         item_obj.item_name = data["item_name"]
                         item_obj.quantity = data["quantity"]
                         item_obj.unit_price = data["unit_price"]
-                        item_obj.minimum_stock_level = (
-                            data["minimum_stock_level"])
+                        item_obj.minimum_stock_level = data[
+                            "minimum_stock_level"
+                        ]
                         item_obj.category = data["category"]
                         item_obj.reorder_level = data["reorder_level"]
                         item_obj.supplier_id = data["supplier_id"]
                         self.inventory_view.update(
                             db_session=session,
                             record_id=int(item_id),
-                            record=item_obj
+                            record=item_obj,
                         )
                         QMessageBox.information(
                             self, "Success", "Item updated successfully!"
@@ -352,13 +362,15 @@ class InventoryGUI(QMainWindow):
             selected_row = self.inventory_table.currentRow()
             if selected_row == -1:
                 QMessageBox.warning(
-                    self, "Warning", "Please select an item to delete.")
+                    self, "Warning", "Please select an item to delete."
+                )
                 return
 
             item = self.inventory_table.item(selected_row, 0)
             if item is None:
                 QMessageBox.warning(
-                    self, "Warning", "Selected item ID is invalid.")
+                    self, "Warning", "Selected item ID is invalid."
+                )
                 return
             item_id = item.text()
 
@@ -372,13 +384,16 @@ class InventoryGUI(QMainWindow):
             if confirmation == QMessageBox.StandardButton.Yes:
                 with Session(engine) as session:
                     self.inventory_view.delete(
-                        db_session=session, record_id=int(item_id))
+                        db_session=session, record_id=int(item_id)
+                    )
                     QMessageBox.information(
-                        self, "Success", "Item deleted successfully!")
+                        self, "Success", "Item deleted successfully!"
+                    )
                     self.load_inventory()
         except Exception as e:
             QMessageBox.critical(
-                self, "Error", f"Failed to delete item: {e!s}")
+                self, "Error", f"Failed to delete item: {e!s}"
+            )
 
 
 if __name__ == "__main__":

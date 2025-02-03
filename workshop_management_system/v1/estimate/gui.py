@@ -67,20 +67,26 @@ class EstimateDialog(QDialog):
         self.customer_id_input = QLineEdit(self)
 
         self.form_layout.addRow(
-            "Total Estimate Amount:", self.total_amount_input)
+            "Total Estimate Amount:", self.total_amount_input
+        )
         self.form_layout.addRow("Status:", self.status_input)
         self.form_layout.addRow(
-            "Description (optional):", self.description_input)
+            "Description (optional):", self.description_input
+        )
         self.form_layout.addRow(
-            "Valid Until (YYYY-MM-DD):", self.valid_until_input)
+            "Valid Until (YYYY-MM-DD):", self.valid_until_input
+        )
         self.form_layout.addRow("Vehicle ID:", self.vehicle_id_input)
         self.form_layout.addRow(
-            "Job Card ID (optional):", self.job_card_id_input)
+            "Job Card ID (optional):", self.job_card_id_input
+        )
         self.form_layout.addRow("Customer ID:", self.customer_id_input)
 
         self.buttons = QDialogButtonBox(
-            (QDialogButtonBox.StandardButton.Ok |
-             QDialogButtonBox.StandardButton.Cancel),
+            (
+                QDialogButtonBox.StandardButton.Ok
+                | QDialogButtonBox.StandardButton.Cancel
+            ),
             self,
         )
         self.buttons.accepted.connect(self.accept)
@@ -182,7 +188,8 @@ class EstimateGUI(QMainWindow):
         # Estimate table
         self.estimate_table = QTableWidget()
         self.estimate_table.setSelectionBehavior(
-            QTableWidget.SelectionBehavior.SelectRows)
+            QTableWidget.SelectionBehavior.SelectRows
+        )
         self.estimate_table.setAlternatingRowColors(True)
         table_layout.addWidget(self.estimate_table)
         main_layout.addWidget(table_frame)
@@ -240,27 +247,44 @@ class EstimateGUI(QMainWindow):
 
                 for row, estimate in enumerate(estimates):
                     self.estimate_table.setItem(
-                        row, 0, QTableWidgetItem(str(estimate.id)))
+                        row, 0, QTableWidgetItem(str(estimate.id))
+                    )
                     self.estimate_table.setItem(
-                        row, 1, QTableWidgetItem(str(estimate.estimate_date)))
+                        row, 1, QTableWidgetItem(str(estimate.estimate_date))
+                    )
                     self.estimate_table.setItem(
-                        row, 2, QTableWidgetItem(
-                            str(estimate.total_estimate_amount)))
+                        row,
+                        2,
+                        QTableWidgetItem(str(estimate.total_estimate_amount)),
+                    )
                     self.estimate_table.setItem(
-                        row, 3, QTableWidgetItem(estimate.status))
+                        row, 3, QTableWidgetItem(estimate.status)
+                    )
                     self.estimate_table.setItem(
-                        row, 4, QTableWidgetItem(estimate.description or ""))
+                        row, 4, QTableWidgetItem(estimate.description or "")
+                    )
                     self.estimate_table.setItem(
-                        row, 5, QTableWidgetItem(str(estimate.valid_until)))
+                        row, 5, QTableWidgetItem(str(estimate.valid_until))
+                    )
                     self.estimate_table.setItem(
-                        row, 6, QTableWidgetItem(str(estimate.customer_id)))
+                        row, 6, QTableWidgetItem(str(estimate.customer_id))
+                    )
                     self.estimate_table.setItem(
-                        row, 7, QTableWidgetItem(str(estimate.vehicle_id)))
+                        row, 7, QTableWidgetItem(str(estimate.vehicle_id))
+                    )
                     self.estimate_table.setItem(
-                        row, 8, QTableWidgetItem(str(estimate.job_card_id) if estimate.job_card_id else ""))
+                        row,
+                        8,
+                        QTableWidgetItem(
+                            str(estimate.job_card_id)
+                            if estimate.job_card_id
+                            else ""
+                        ),
+                    )
         except Exception as e:
             QMessageBox.critical(
-                self, "Error", f"Failed to load estimates: {e!s}")
+                self, "Error", f"Failed to load estimates: {e!s}"
+            )
 
     def add_estimate(self) -> None:
         """Add a new estimate to the database."""
@@ -271,7 +295,9 @@ class EstimateGUI(QMainWindow):
                 with Session(engine) as session:
                     vehicle = session.exec(
                         select(Vehicle).where(
-                            Vehicle.id == int(data["vehicle_id"]))).first()
+                            Vehicle.id == int(data["vehicle_id"])
+                        )
+                    ).first()
                     if not vehicle:
                         raise ValueError("Vehicle not found")
 
@@ -280,32 +306,41 @@ class EstimateGUI(QMainWindow):
                         total_estimate_amount=data["total_amount"],
                         status=data["status"],
                         description=data["description"],
-                        valid_until=datetime.strptime(data["valid_until"], "%Y-%m-%d"),
+                        valid_until=datetime.strptime(
+                            data["valid_until"], "%Y-%m-%d"
+                        ),
                         customer_id=vehicle.customer_id,
                         vehicle_id=vehicle.id,
-                        job_card_id=int(data["job_card_id"]) if data["job_card_id"] else None,
+                        job_card_id=int(data["job_card_id"])
+                        if data["job_card_id"]
+                        else None,
                     )
                     self.estimate_view.create(
-                        db_session=session, record=new_estimate)
+                        db_session=session, record=new_estimate
+                    )
                     QMessageBox.information(
-                        self, "Success", "Estimate added successfully!")
+                        self, "Success", "Estimate added successfully!"
+                    )
                     self.load_estimates()
             except Exception as e:
                 QMessageBox.critical(
-                    self, "Error", f"Failed to add estimate: {e!s}")
+                    self, "Error", f"Failed to add estimate: {e!s}"
+                )
 
     def update_estimate(self) -> None:
         """Update an existing estimate."""
         selected_row = self.estimate_table.currentRow()
         if selected_row == -1:
             QMessageBox.warning(
-                self, "Warning", "Please select an estimate to update.")
+                self, "Warning", "Please select an estimate to update."
+            )
             return
 
         item = self.estimate_table.item(selected_row, 0)
         if item is None:
             QMessageBox.warning(
-                self, "Warning", "Selected estimate ID is invalid.")
+                self, "Warning", "Selected estimate ID is invalid."
+            )
             return
         estimate_id = item.text()
 
@@ -316,16 +351,20 @@ class EstimateGUI(QMainWindow):
                 with Session(engine) as session:
                     vehicle = session.exec(
                         select(Vehicle).where(
-                            Vehicle.id == int(data["vehicle_id"]))).first()
+                            Vehicle.id == int(data["vehicle_id"])
+                        )
+                    ).first()
                     if not vehicle:
                         raise ValueError("Vehicle not found")
 
                     estimate_obj = self.estimate_view.read_by_id(
-                        db_session=session, record_id=int(estimate_id))
+                        db_session=session, record_id=int(estimate_id)
+                    )
                     if estimate_obj:
                         estimate_obj.estimate_date = datetime.now()
-                        estimate_obj.total_estimate_amount = (
-                            data["total_amount"])
+                        estimate_obj.total_estimate_amount = data[
+                            "total_amount"
+                        ]
                         estimate_obj.status = data["status"]
                         estimate_obj.description = data["description"]
                         estimate_obj.valid_until = datetime.strptime(
@@ -333,18 +372,24 @@ class EstimateGUI(QMainWindow):
                         )
                         estimate_obj.customer_id = vehicle.customer_id
                         estimate_obj.vehicle_id = vehicle.id
-                        estimate_obj.job_card_id = int(data["job_card_id"]) if data["job_card_id"] else None
+                        estimate_obj.job_card_id = (
+                            int(data["job_card_id"])
+                            if data["job_card_id"]
+                            else None
+                        )
                         self.estimate_view.update(
                             db_session=session,
                             record_id=int(estimate_id),
                             record=estimate_obj,
                         )
                         QMessageBox.information(
-                            self, "Success", "Estimate updated successfully!")
+                            self, "Success", "Estimate updated successfully!"
+                        )
                         self.load_estimates()
             except Exception as e:
                 QMessageBox.critical(
-                    self, "Error", f"Failed to update estimate: {e!s}")
+                    self, "Error", f"Failed to update estimate: {e!s}"
+                )
 
     def delete_estimate(self) -> None:
         """Delete an estimate from the database."""
@@ -352,13 +397,15 @@ class EstimateGUI(QMainWindow):
             selected_row = self.estimate_table.currentRow()
             if selected_row == -1:
                 QMessageBox.warning(
-                    self, "Warning", "Please select an estimate to delete.")
+                    self, "Warning", "Please select an estimate to delete."
+                )
                 return
 
             item = self.estimate_table.item(selected_row, 0)
             if item is None:
                 QMessageBox.warning(
-                    self, "Warning", "Selected estimate ID is invalid.")
+                    self, "Warning", "Selected estimate ID is invalid."
+                )
                 return
             estimate_id = item.text()
 
@@ -372,13 +419,16 @@ class EstimateGUI(QMainWindow):
             if confirmation == QMessageBox.StandardButton.Yes:
                 with Session(engine) as session:
                     self.estimate_view.delete(
-                        db_session=session, record_id=int(estimate_id))
+                        db_session=session, record_id=int(estimate_id)
+                    )
                     QMessageBox.information(
-                        self, "Success", "Estimate deleted successfully!")
+                        self, "Success", "Estimate deleted successfully!"
+                    )
                     self.load_estimates()
         except Exception as e:
             QMessageBox.critical(
-                self, "Error", f"Failed to delete estimate: {e!s}")
+                self, "Error", f"Failed to delete estimate: {e!s}"
+            )
 
 
 if __name__ == "__main__":
