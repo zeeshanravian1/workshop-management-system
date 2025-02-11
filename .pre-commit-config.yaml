@@ -1,0 +1,151 @@
+repos:
+  # General git checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+    # Prevents committing large files that can slow down repository
+    # performance, ensuring repo stays lightweight and manageable.
+    - id: check-added-large-files
+
+    # Detects filename conflicts that arise due to case-insensitive
+    # filesystems, preventing issues in cross-platform projects.
+    - id: check-case-conflict
+
+    # Attempts to load all json files to verify syntax.
+    - id: check-json
+
+    # Checks that all your JSON files are pretty. "Pretty" here means that keys
+    # are sorted and indented.
+    - id: pretty-format-json
+      args: ['--autofix']
+
+    # Checks for a common error of placing code before docstring. This can lead
+    # to code being executed before docstring is read, causing confusion and
+    # potential issues.
+    - id: check-docstring-first
+
+    # Removes unnecessary whitespace at end of lines, improving code
+    # readability and preventing potential issues in certain editors.
+    - id: trailing-whitespace
+
+    # Ensures files end with a newline, providing consistency across codebases
+    # and conforming to POSIX standards for better interoperability.
+    - id: end-of-file-fixer
+
+    # Checks for UTF-8 byte order marker (BOM) in files, preventing potential
+    # issues with BOMs in Python source files.
+    - id: fix-byte-order-marker
+
+    # Checks for merge conflicts in repository, preventing accidental merge
+    # conflicts from being committed.
+    - id: check-merge-conflict
+
+    # Check for debugger imports and py37+ breakpoint() calls in python source.
+    - id: debug-statements
+
+    # Checks that executables have a shebang, ensuring that script is executed
+    # with correct interpreter.
+    - id: check-executables-have-shebangs
+
+    # Verifies that scripts with a shebang are marked as executable, ensuring
+    # proper script execution in Unix-based systems.
+    - id: check-shebang-scripts-are-executable
+
+    # Checks for symlinks which do not point to anything. This can happen when
+    # target of symlink is removed.
+    - id: check-symlinks
+
+    # Detects symlinks which are changed to regular files with a content of a
+    # path which that symlink was pointing to. This usually happens on Windows
+    # when a user clones a repository that has symlinks but they do not have
+    # permission to create symlinks.
+    - id: destroyed-symlinks
+
+    # Simply check whether files parse as valid python.
+    - id: check-ast
+
+    # Validates YAML files' syntax and structure, preventing potential issues
+    # caused by improperly formatted configuration files.
+    - id: check-yaml
+
+    # Attempts to load all TOML files to verify syntax.
+    - id: check-toml
+
+    # Attempts to load all xml files to verify syntax.
+    - id: check-xml
+
+    # Sorts Python package requirements in a requirements.txt file
+    # alphabetically, improving readability and simplifying dependency
+    # management.
+    - id: requirements-txt-fixer
+
+    # Identifies accidentally committed private keys, protecting sensitive
+    # information from being exposed in public repositories.
+    - id: detect-private-key
+
+    # verifies that test files are named correctly. Files should be named
+    # --pytest (default): ensure tests match .*_test\.py
+    # --pytest-test-first: ensure tests match test_.*\.py
+    # --django / --unittest: ensure tests match test.*\.py
+    - id: name-tests-test
+      args: ['--pytest-test-first']
+
+  # A tool (and pre-commit hook) to automatically upgrade syntax for newer
+  # versions of language.
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.19.1
+    hooks:
+    - id: pyupgrade
+
+  # Enforces a consistent code formatting style throughout project, improving
+  # code readability and reducing formatting-related discussions during code
+  # reviews.
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+    - id: black
+      args: ["--line-length", "79"]
+      language_version: python3.12
+
+  # Checks Python code for adherence to PEP 8 style guidelines, potential
+  # programming errors, and code complexity, helping maintain code quality.
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.1
+    hooks:
+    - id: flake8
+      exclude: .git,__pycache__
+      language_version: python3.12
+
+  # A tool to automatically format Python code to conform to the PEP 8 style
+  # guide, improving code readability and consistency.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.9.6
+    hooks:
+      # Run linter.
+      - id: ruff
+      # Run formatter.
+      - id: ruff-format
+        args: ["--line-length", "79"]
+
+  # A tool to check Python code for type hints and type errors, ensuring that
+  # code is correctly annotated and free of type-related issues.
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.393
+    hooks:
+    - id: pyright
+      language: system
+
+  # A tool for finding common security issues in Python code, helping ensure
+  # secure code practices and prevent security vulnerabilities.
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.2
+    hooks:
+    - id: bandit
+      name: bandit
+      description: 'Bandit is a tool for finding common security issues in Python code'
+      entry: bandit
+      language: python
+      language_version: python3
+      types: [python]
+      require_serial: true
