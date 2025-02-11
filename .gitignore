@@ -174,3 +174,6 @@ cython_debug/
 
 # Alembic Migration
 alembic/versions/*.py
+
+# SQLite database files
+*.db
