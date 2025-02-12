@@ -1,7 +1,7 @@
 """Customer Model.
 
 Description:
-- This module contains model for Customer table.
+- This module contains model for customer table.
 
 """
 
@@ -16,7 +16,7 @@ class CustomerBase(SQLModel):
     """Customer Base Table.
 
     Description:
-    - This class contains base model for Customer table.
+    - This class contains base model for customer table.
 
     :Attributes:
     - `name (str)`: Name of customer.
@@ -38,6 +38,15 @@ class Customer(Base, CustomerBase, table=True):
     """Customer Table.
 
     Description:
-    - This class contains model for Customer table.
+    - This class contains model for customer table.
+
+    :Attributes:
+    - `id (int)`: Unique identifier for customer.
+    - `name (str)`: Name of customer.
+    - `email (str)`: Email of customer.
+    - `contact_no (str)`: Contact number of customer.
+    - `address (str)`: Address of customer.
+    - `created_at (datetime)`: Timestamp when customer was created.
+    - `updated_at (datetime)`: Timestamp when customer was last updated.
 
     """

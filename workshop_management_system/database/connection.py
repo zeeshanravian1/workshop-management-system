@@ -25,7 +25,7 @@ class Base(SQLModel):
     - This is base model for all tables.
 
     :Attributes:
-    - `id (int)`: Primary key for all tables.
+    - `id (int)`: Unique identifier for record.
     - `created_at (datetime)`: Timestamp when record was created.
     - `updated_at (datetime | None)`: Timestamp when record was last updated.
 
@@ -37,7 +37,7 @@ class Base(SQLModel):
         default=None, sa_column_kwargs={"onupdate": now()}
     )
 
-    class ModelConfig:
+    class ModelConfig:  # pylint: disable=too-few-public-methods
         """Configuration for BaseTable."""
 
         str_strip_whitespace = True
