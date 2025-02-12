@@ -37,7 +37,7 @@ class Base(SQLModel):
         default=None, sa_column_kwargs={"onupdate": now()}
     )
 
-    class BaseConfig:
+    class ModelConfig:
         """Configuration for BaseTable."""
 
-        arbitrary_types_allowed = True
+        str_strip_whitespace = True
