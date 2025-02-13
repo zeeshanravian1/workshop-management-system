@@ -27,7 +27,7 @@ httpie = "^3.2.4"
 ipykernel = "^6.29.5"
 jupyter = "^1.1.1"
 radon = "^6.0.1"
-pyright = "^1.1.393"
+pyright = "^1.1.394"
 mypy = "^1.15.0"
 python-lsp-server = {extras = ["all"], version = "^1.12.2"}
 black = "^25.1.0"
@@ -42,6 +42,9 @@ gitlint = "^0.19.1"
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "class"
 
 [tool.mypy]
 strict = true

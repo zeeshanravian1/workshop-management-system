@@ -131,7 +131,7 @@ repos:
   # A tool to check Python code for type hints and type errors, ensuring that
   # code is correctly annotated and free of type-related issues.
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.393
+    rev: v1.1.394
     hooks:
     - id: pyright
       language: system
@@ -149,3 +149,4 @@ repos:
       language_version: python3
       types: [python]
       require_serial: true
+      exclude: tests/
