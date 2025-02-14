@@ -29,12 +29,14 @@ class TestSupplier(TestSetup):
     validation.
     - `test_supplier_2` (SupplierBase): An instance of SupplierBase class for
     validation.
+
     """
 
     supplier_view: SupplierView
     test_supplier_1: SupplierBase
     test_supplier_2: SupplierBase
 
+    @pytest.fixture(autouse=True)
     def setup_method(self) -> None:
         """Setup method for test cases."""
         self.supplier_view = SupplierView(Supplier)
@@ -343,7 +345,7 @@ class TestSupplier(TestSetup):
         assert result is not None
         assert result.id == supplier.id
 
-        # Verify Supplier no longer exists
+        # Verify supplier no longer exists
         retrieved_supplier: Supplier | None = self.supplier_view.read_by_id(
             db_session=self.session, record_id=supplier.id
         )

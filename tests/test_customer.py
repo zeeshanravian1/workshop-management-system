@@ -29,12 +29,14 @@ class TestCustomer(TestSetup):
     validation.
     - `test_customer_2` (CustomerBase): An instance of CustomerBase class for
     validation.
+
     """
 
     customer_view: CustomerView
     test_customer_1: CustomerBase
     test_customer_2: CustomerBase
 
+    @pytest.fixture(autouse=True)
     def setup_method(self) -> None:
         """Setup method for test cases."""
         self.customer_view = CustomerView(Customer)
