@@ -10,18 +10,7 @@ from pathlib import Path
 
 
 def load_all_models() -> None:
-    """Load SQLModel models from project.
-
-    Description:
-    - This function is used to load all SQLModel models from project.
-
-    :Args:
-    - `None`
-
-    :Returns:
-    - `None`
-
-    """
+    """Load SQLModel models from project."""
     base_path: Path = Path(__file__).resolve().parent.parent.parent
 
     # Discover all Python files in project

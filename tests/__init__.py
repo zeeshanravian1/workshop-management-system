@@ -1,6 +1,6 @@
-"""Workshop Management System Tests Package.
+"""Workshop Tests Package.
 
 Description:
-- This package contains test cases for workshop management system.
+- This package contains test cases for workshop.
 
 """

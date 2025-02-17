@@ -18,9 +18,11 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from workshop_management_system.core.config import DATABASE_URL
 from workshop_management_system.core.load_models import load_all_models
+from workshop_management_system.v1.customer.model import Customer  # noqa: F401
+from workshop_management_system.v1.vehicle.model import Vehicle  # noqa: F401
 
 
-class TestSetup:  # pylint: disable=too-few-public-methods
+class TestSetup:
     """Test Setup Class.
 
     Description:
@@ -38,7 +40,7 @@ class TestSetup:  # pylint: disable=too-few-public-methods
     session: Session
 
     @pytest.fixture(autouse=True)
-    def setup(self) -> Generator[None, Session]:
+    def setup(self) -> Generator[None, Session, None]:
         """Setup for tests.
 
         :Args:

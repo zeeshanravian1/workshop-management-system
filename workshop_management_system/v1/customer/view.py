@@ -13,6 +13,6 @@ class CustomerView(BaseView[Customer]):
     """Customer View Class.
 
     Description:
-    - This class provides CRUD interface for customer model.
+    - This class provides CRUD interface for Customer model.
 
     """

@@ -8,6 +8,7 @@ Description:
 from collections.abc import Sequence
 from typing import Generic, TypeVar
 
+# from uuid import UUID
 from sqlmodel import Session, select, update
 
 from workshop_management_system.database.connection import Base
@@ -19,7 +20,7 @@ class BaseView(Generic[Model]):
     """Base View Class.
 
     Description:
-    - This class provides a generic CRUD interface for database models.
+    - This class provides a generic CRUD interface for SQLModel models.
 
     """
 

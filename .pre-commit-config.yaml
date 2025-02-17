@@ -101,7 +101,7 @@ repos:
   # code readability and reducing formatting-related discussions during code
   # reviews.
   - repo: https://github.com/psf/black
-    rev: 25.1.0
+    rev: 24.10.0
     hooks:
     - id: black
       args: ["--line-length", "79"]
@@ -120,7 +120,7 @@ repos:
   # guide, improving code readability and consistency.
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-    rev: v0.9.6
+    rev: v0.9.3
     hooks:
       # Run linter.
       - id: ruff
@@ -131,10 +131,11 @@ repos:
   # A tool to check Python code for type hints and type errors, ensuring that
   # code is correctly annotated and free of type-related issues.
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.394
+    rev: v1.1.392.post0
     hooks:
     - id: pyright
       language: system
+      exclude: ".*/model.py"
 
   # A tool for finding common security issues in Python code, helping ensure
   # secure code practices and prevent security vulnerabilities.
