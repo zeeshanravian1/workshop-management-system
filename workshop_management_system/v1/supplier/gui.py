@@ -9,9 +9,9 @@ import re
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QComboBox  # Add this import
 from PyQt6.QtWidgets import (
     QApplication,
-    QComboBox,  # Add this import
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -228,21 +228,19 @@ class SupplierGUI(QWidget):
 
         # Supplier table
         self.supplier_table = QTableWidget()
-        self.supplier_table.setMinimumHeight(300)
-        self.supplier_table.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
         self.supplier_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
         )
         self.supplier_table.setAlternatingRowColors(True)
+        self.supplier_table.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         self.supplier_table.setStyleSheet("""
             QTableWidget {
                 border: 1px solid black;
                 background-color: white;
                 border-radius: 5px;
                 padding: 5px;
-                margin: 0px;
             }
             QTableWidget::item {
                 border: none;
@@ -272,12 +270,23 @@ class SupplierGUI(QWidget):
         self.supplier_table.setEditTriggers(
             QTableWidget.EditTrigger.NoEditTriggers
         )
-        self.supplier_table.setSelectionMode(
-            QTableWidget.SelectionMode.NoSelection
+        self.supplier_table.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
         )
-        self.supplier_table.horizontalHeader().setStretchLastSection(True)
-        self.supplier_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
+        self.supplier_table.customContextMenuRequested.connect(
+            self.show_context_menu
+        )
+        self.supplier_table.setSelectionMode(
+            QTableWidget.SelectionMode.SingleSelection
+        )
+        self.supplier_table.setSelectionBehavior(
+            QTableWidget.SelectionBehavior.SelectRows
+        )
+        self.supplier_table.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        self.supplier_table.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
         table_layout.addWidget(self.supplier_table)
         main_layout.addWidget(table_frame, 1)
@@ -476,7 +485,10 @@ class SupplierGUI(QWidget):
                     len(current_page_suppliers) + 1, self.page_size + 1
                 )
                 table_height = (row_height * visible_rows) + 20
-                self.supplier_table.setMinimumHeight(table_height)
+                self.supplier_table.setMinimumHeight(0)
+                self.supplier_table.setMaximumHeight(
+                    16777215
+                )  # Qt's maximum value
 
                 self.update_pagination_buttons(total_pages)
                 self.prev_button.setEnabled(self.current_page > 1)
@@ -685,6 +697,51 @@ class SupplierGUI(QWidget):
         if page_number != self.current_page:
             self.current_page = page_number
             self.load_suppliers(refresh_all=False)
+
+    def show_context_menu(self, position):
+        """Show context menu for table row."""
+        row = self.supplier_table.rowAt(position.y())
+        if row > 0:  # Skip header row
+            self.supplier_table.selectRow(row)
+            context_menu = QMenu(self)
+            context_menu.setStyleSheet("""
+                QMenu {
+                    background-color: white;
+                    border: 1px solid #cccccc;
+                    padding: 5px;
+                }
+                QMenu::item {
+                    padding: 8px 25px;
+                    color: black;
+                    border-radius: 4px;
+                    margin: 2px 5px;
+                }
+                QMenu::item:selected {
+                    background-color: #4CAF50;
+                    color: white;
+                }
+                QMenu::separator {
+                    height: 1px;
+                    background: #cccccc;
+                    margin: 5px 0px;
+                }
+            """)
+
+            update_action = context_menu.addAction("✏️ Update")
+            update_action.setStatusTip("Update selected supplier")
+
+            context_menu.addSeparator()
+
+            delete_action = context_menu.addAction("🗑️ Delete")
+            delete_action.setStatusTip("Delete selected supplier")
+
+            action = context_menu.exec(
+                self.supplier_table.mapToGlobal(position)
+            )
+            if action == update_action:
+                self.update_supplier()
+            elif action == delete_action:
+                self.delete_supplier()
 
 
 if __name__ == "__main__":

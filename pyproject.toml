@@ -18,7 +18,8 @@ dependencies = [
     "types-passlib (>=1.7.7.20241221,<2.0.0.0)",
     "pyqt6 (>=6.8.0,<7.0.0)",
     "pyinstaller (>=6.11.1,<7.0.0)",
-    "cx-freeze (>=7.2.8,<8.0.0)"
+    "cx-freeze (>=7.2.8,<8.0.0)",
+    "faker (>=36.1.1,<37.0.0)"
 ]
 
 [tool.poetry.group.dev.dependencies]

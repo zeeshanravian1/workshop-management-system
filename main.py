@@ -1,158 +1,86 @@
-"""Main module for project.
+"""Sample data generator for testing CustomerGUI."""
 
-Description:
-- This module is main file for project.
+import sys
 
-"""
-
-from collections.abc import Sequence
-from uuid import UUID
+from faker import Faker
+from PyQt6.QtWidgets import QApplication
 
 from workshop_management_system.database.session import get_session
+from workshop_management_system.v1.customer.gui import CustomerGUI
 from workshop_management_system.v1.customer.model import Customer
 from workshop_management_system.v1.customer.view import CustomerView
-from workshop_management_system.v1.vehicle.model import Vehicle
-from workshop_management_system.v1.vehicle.view import VehicleView
 
-# Instantiate views
-customer_view = CustomerView(Customer)
-vehicle_view = VehicleView(Vehicle)
 
-with get_session() as session:
-    print("Creating Customers...")
-    # Create a customer
-    new_customer1: Customer = customer_view.create(
-        db_session=session,
-        record=Customer(
-            name="John Doe",
-            mobile_number="1234567890",
-            vehicle_registration_number="ABC123",
-            email="john.doe@example.com",
-            address="123 Main Street, Springfield",
-        ),
-    )
-    print(f"Customer Created: {new_customer1.model_dump()}")
+def generate_sample_customers(num_records=1000):
+    """Generate sample customer data."""
+    fake = Faker()
+    customers = []
 
-    # Create another customer
-    new_customer2: Customer = customer_view.create(
-        db_session=session,
-        record=Customer(
-            name="Jane Doe",
-            mobile_number="0987654321",
-            vehicle_registration_number="XYZ789",
-            email="jane.doe@example.com",
-            address="456 Elm Street, Springfield",
-        ),
-    )
-    print(f"Customer Created: {new_customer2.model_dump()}")
+    print(f"Generating {num_records} sample customers...")
+    for i in range(num_records):
+        try:
+            customer = Customer(
+                name=fake.name(),
+                mobile_number=f"+{fake.random_int(min=1, max=99)}{fake.msisdn()[3:12]}",
+                email=fake.email(),
+                address=fake.address().replace("\n", ", "),
+                is_deleted=False,
+            )
+            customers.append(customer)
+            if (i + 1) % 100 == 0:
+                print(f"Generated {i + 1} customers...")
+        except Exception as e:
+            print(f"Error generating customer: {e}")
+            continue
 
-    print("******************************************************************")
+    return customers
 
-    print("Get Single Customer...")
-    # Read single customer
-    customer: Customer | None = customer_view.read_by_id(
-        db_session=session, record_id=new_customer1.id
-    )
 
-    if customer:
-        print(f"Customer: {customer.model_dump()}")
-    else:
-        print("Customer not found.")
+def setup_database():
+    """Set up database with sample data."""
+    try:
+        customer_view = CustomerView(Customer)
 
-    print("******************************************************************")
+        with get_session() as session:
+            # Clear existing data
+            print("\nClearing existing customer data...")
+            session.query(Customer).delete()
+            session.commit()
 
-    print("Get Non Existent Customer...")
-    # Read non-existent customer
-    non_existent_customer: Customer | None = customer_view.read_by_id(
-        db_session=session,
-        record_id=UUID("00000000-0000-0000-0000-000000000000"),
-    )
+            # Generate and add new sample data
+            customers = generate_sample_customers(1000)
 
-    if non_existent_customer:
-        print(f"Customer: {non_existent_customer.model_dump()}")
-    else:
-        print("Customer not found.")
+            print("\nAdding customers to database...")
+            count = 0
+            for customer in customers:
+                try:
+                    customer_view.create(db_session=session, record=customer)
+                    count += 1
+                    if count % 100 == 0:
+                        print(f"Added {count} customers...")
+                except Exception as e:
+                    print(f"Error adding customer: {e}")
+                    continue
 
-    print("******************************************************************")
+            print("\nDatabase setup complete!")
+            print(f"Total customers added: {count}")
 
-    print("Get All Customers...")
-    # Read all customers
-    customers: Sequence[Customer] = customer_view.read_all(db_session=session)
+    except Exception as e:
+        print(f"Database setup error: {e}")
+        sys.exit(1)
 
-    for customer in customers:
-        print(f"Customer: {customer.model_dump()}")
 
-    print("******************************************************************")
+def main():
+    """Run the customer GUI with sample data."""
+    # First set up the database with sample data
+    setup_database()
 
-    print("Updating Customer...")
-    # Update a customer
-    updated_customer: Customer | None = customer_view.update(
-        db_session=session,
-        record_id=new_customer1.id,
-        record=Customer(
-            name="John Smith",
-            mobile_number="1234567890",
-            vehicle_registration_number="ABC123",
-            email="john.smith@example.com",
-            address="123 Main Street, Springfield",
-        ),
-    )
+    # Then launch the GUI
+    app = QApplication(sys.argv)
+    window = CustomerGUI()
+    window.show()
+    sys.exit(app.exec())
 
-    if updated_customer:
-        print(f"Customer Updated: {updated_customer.model_dump()}")
-    else:
-        print("Customer not found.")
 
-    print("******************************************************************")
-
-    print("Updating Non Existent Customer...")
-    # Update a non-existent customer
-    updated_non_existent_customer: Customer | None = customer_view.update(
-        db_session=session,
-        record_id=UUID("00000000-0000-0000-0000-000000000000"),
-        record=Customer(
-            name="John Smith",
-            mobile_number="1234567890",
-            vehicle_registration_number="ABC123",
-            email="john.smith@example.com",
-            address="123 Main Street, Springfield",
-        ),
-    )
-
-    if updated_non_existent_customer:
-        print(
-            f"Customer Updated: {updated_non_existent_customer.model_dump()}"
-        )
-    else:
-        print("Customer not found.")
-
-    print("******************************************************************")
-
-    print("Deleting Customer...")
-    # Delete a customer
-    deleted_customer: Customer | None = customer_view.delete(
-        db_session=session, record_id=new_customer2.id
-    )
-
-    if deleted_customer:
-        print(f"Customer Deleted: {deleted_customer.model_dump()}")
-    else:
-        print("Customer not found.")
-
-    print("******************************************************************")
-
-    print("Deleting Non Existent Customer...")
-    # Delete a non-existent customer
-    deleted_non_existent_customer: Customer | None = customer_view.delete(
-        db_session=session,
-        record_id=UUID("00000000-0000-0000-0000-000000000000"),
-    )
-
-    if deleted_non_existent_customer:
-        print(
-            f"Customer Deleted: {deleted_non_existent_customer.model_dump()}"
-        )
-    else:
-        print("Customer not found.")
-
-    print("******************************************************************")
+if __name__ == "__main__":
+    main()
