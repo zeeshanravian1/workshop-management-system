@@ -3,55 +3,48 @@ name = "workshop-management-system"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "Zeeshan Asim",email = "zeeshanravian1@gmail.com"}
+    {name = "Zeeshan Asim",email = "zeeshanravian1@mail.com"}
 ]
 readme = "README.md"
 
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "environs (>=14.1.0,<15.0.0)",
     "sqlmodel (>=0.0.22,<0.0.23)",
     "sqlalchemy-utils (>=0.41.2,<0.42.0)",
     "types-sqlalchemy-utils (>=1.1.0,<2.0.0)",
-    "pydantic[email] (>=2.10.6,<3.0.0)",
-    "pydantic-extra-types (>=2.10.2,<3.0.0)",
     "alembic (>=1.14.1,<2.0.0)",
-    "phonenumbers (>=8.13.54,<9.0.0)",
-    "pyqt6 (>=6.8.1,<7.0.0)",
-    "pyinstaller (>=6.12.0,<7.0.0)"
+    "passlib (>=1.7.4,<2.0.0)",
+    "types-passlib (>=1.7.7.20241221,<2.0.0.0)",
+    "pyqt6 (>=6.8.0,<7.0.0)",
+    "pyinstaller (>=6.11.1,<7.0.0)",
+    "cx-freeze (>=7.2.8,<8.0.0)"
 ]
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.1.0"
-pytest-asyncio = "^0.25.3"
-httpie = "^3.2.4"
+pytest = "^8.3.4"
 ipykernel = "^6.29.5"
 jupyter = "^1.1.1"
-radon = "^6.0.1"
-pyright = "^1.1.394"
-mypy = "^1.15.0"
-python-lsp-server = {extras = ["all"], version = "^1.12.2"}
-black = "^25.1.0"
+pyright = "^1.1.392.post0"
+mypy = "^1.14.1"
+python-lsp-server = {extras = ["all"], version = "^1.12.0"}
+black = "^24.10.0"
 pyupgrade = "^3.19.1"
-ruff = "^0.9.6"
-skjold = "^0.6.2"
+ruff = "^0.9.3"
 bandit = "^1.8.2"
-coverage = "^7.6.11"
-logfire = "^3.5.3"
-gitlint = "^0.19.1"
+coverage = "^7.6.10"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.pytest.ini_options]
-asyncio_default_fixture_loop_scope = "class"
 
 [tool.mypy]
 strict = true
 exclude = ["venv", ".venv", "alembic"]
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py312"
 line-length = 79
 
 [tool.ruff.lint]
@@ -86,12 +79,3 @@ convention = "google"
 [tool.ruff.lint.isort]
 combine-as-imports = true
 split-on-trailing-comma = false
-
-[tool.skjold]
-sources = ["github", "pyup", "gemnasium"]  # Sources to check against.
-report_only = false                        # Exit with non-zero exit code on findings.
-report_format = 'cli'                      # Output findings as `json`. Default is 'cli'.
-cache_dir = '.skjold_cache'                # Cache location (default: `~/.skjold/cache`).
-cache_expires = 86400                      # Cache max. age.
-ignore_file = '.skjoldignore'              # Ignorefile location (default `.skjoldignore`).
-verbose = true                             # Be verbose.

@@ -13,6 +13,6 @@ class SupplierView(BaseView[Supplier]):
     """Supplier View Class.
 
     Description:
-    - This class provides CRUD interface for supplier model.
+    - This class provides CRUD interface for Supplier model.
 
     """

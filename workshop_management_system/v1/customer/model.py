@@ -1,52 +1,32 @@
 """Customer Model.
 
 Description:
-- This module contains model for customer table.
+- This module contains model for Customer table.
 
 """
 
-from pydantic import EmailStr
-from pydantic_extra_types.phone_numbers import PhoneNumber
-from sqlmodel import Field, SQLModel
+from typing import TYPE_CHECKING
+
+from sqlmodel import Field, Relationship
 
 from workshop_management_system.database.connection import Base
 
+if TYPE_CHECKING:
+    from ..complaint.model import Complaint
+    from ..estimate.model import Estimate
+    from ..payment.model import Payment
+    from ..vehicle.model import Vehicle
 
-class CustomerBase(SQLModel):
-    """Customer Base Table.
 
-    Description:
-    - This class contains base model for customer table.
-
-    :Attributes:
-    - `name (str)`: Name of customer.
-    - `email (str)`: Email of customer.
-    - `contact_no (str)`: Contact number of customer.
-    - `address (str)`: Address of customer.
-
-    """
+class Customer(Base, table=True):
+    """Customer Table."""
 
     name: str = Field(max_length=255)
-    email: EmailStr | None = Field(
-        max_length=255, unique=True, nullable=True, index=True
-    )
-    contact_no: PhoneNumber = Field(max_length=255, unique=True, index=True)
-    address: str | None = Field(max_length=255, nullable=True)
+    mobile_number: str = Field(max_length=20)
+    email: str = Field(max_length=255)
+    address: str
 
-
-class Customer(Base, CustomerBase, table=True):
-    """Customer Table.
-
-    Description:
-    - This class contains model for customer table.
-
-    :Attributes:
-    - `id (int)`: Unique identifier for customer.
-    - `name (str)`: Name of customer.
-    - `email (str)`: Email of customer.
-    - `contact_no (str)`: Contact number of customer.
-    - `address (str)`: Address of customer.
-    - `created_at (datetime)`: Timestamp when customer was created.
-    - `updated_at (datetime)`: Timestamp when customer was last updated.
-
-    """
+    vehicles: list["Vehicle"] = Relationship(back_populates="customer")
+    estimates: list["Estimate"] = Relationship(back_populates="customer")
+    complaints: list["Complaint"] = Relationship(back_populates="customer")
+    payments: list["Payment"] = Relationship(back_populates="customer")

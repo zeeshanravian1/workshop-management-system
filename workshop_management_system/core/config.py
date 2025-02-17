@@ -1,24 +1,16 @@
 """Core Configuration Module.
 
 Description:
-- This module is responsible for core configuration.
+- This module is responsible for core configuration and read values from
+environment file.
 
 """
 
-from enum import Enum
+# from environs import Env
+
+# env: Env = Env()
+# env.read_env(path=".env")
+
+# Database
 
 DATABASE_URL: str = "sqlite:///database.db"
-
-
-class InventoryCategory(str, Enum):
-    """Inventory Category Enum.
-
-    Description:
-    - This class contains enum for inventory category.
-
-    """
-
-    LUBRICANTS = "lubricants"
-    SPARE_PARTS = "spare_parts"
-    TOOLS = "tools"
-    OTHERS = "others"
