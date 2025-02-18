@@ -1,6 +1,7 @@
 """Inventory Package.
 
 Description:
-- This package contains inventory modules for workshop management system.
+- This package contains the inventory modules for the workshop management
+  system.
 
 """

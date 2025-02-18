@@ -1,13 +1,13 @@
 """Connection Module.
 
 Description:
-- This module is used to configure database connection and contains base table
-for all tables.
+- This module is used to configure database connection and contains all tables.
 
 """
 
 from datetime import datetime
 
+# from uuid import UUID, uuid4
 from sqlalchemy import Engine
 from sqlalchemy.sql.functions import now
 from sqlmodel import Field, MetaData, SQLModel, create_engine
@@ -24,20 +24,16 @@ class Base(SQLModel):
     Description:
     - This is base model for all tables.
 
-    :Attributes:
-    - `id (int)`: Unique identifier for record.
-    - `created_at (datetime)`: Timestamp when record was created.
-    - `updated_at (datetime | None)`: Timestamp when record was last updated.
-
     """
 
+    # id: UUID = Field(default_factory=uuid4, primary_key=True)
     id: int = Field(primary_key=True)
     created_at: datetime = Field(default_factory=now)
     updated_at: datetime | None = Field(
         default=None, sa_column_kwargs={"onupdate": now()}
     )
 
-    class ModelConfig:  # pylint: disable=too-few-public-methods
+    class BaseConfig:  # pylint: disable=too-few-public-methods
         """Configuration for BaseTable."""
 
-        str_strip_whitespace = True
+        arbitrary_types_allowed = True

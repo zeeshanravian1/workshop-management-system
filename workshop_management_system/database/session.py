@@ -13,7 +13,7 @@ from .connection import engine
 
 
 @contextmanager
-def get_session() -> Generator[Session]:
+def get_session() -> Generator[Session, None, None]:
     """Get session.
 
     Description:

@@ -1,6 +1,7 @@
 """Supplier Package.
 
 Description:
-- This package contains supplier modules for workshop management system.
+- This package contains the supplier modules for the workshop management
+  system.
 
 """

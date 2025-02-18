@@ -1,60 +1,34 @@
-"""Inventory Model.
+"""Inventory Models.
 
 Description:
 - This module contains model for inventory table.
-
 """
 
-from sqlmodel import Field, Relationship, SQLModel
+from typing import TYPE_CHECKING
 
-from workshop_management_system.core.config import InventoryCategory
+from sqlmodel import Field, Relationship
+
 from workshop_management_system.database.connection import Base
-from workshop_management_system.v1.inventory_supplier_link.model import (
-    InventorySupplierLink,
+from workshop_management_system.v1.inventory.association import (
+    InventoryEstimate,
 )
-from workshop_management_system.v1.supplier.model import Supplier
+
+if TYPE_CHECKING:
+    from workshop_management_system.v1.estimate.model import Estimate
+    from workshop_management_system.v1.supplier.model import Supplier
 
 
-class InventoryBase(SQLModel):
-    """Inventory Base Table.
+class Inventory(Base, table=True):
+    """Inventory Table."""
 
-    Description:
-    - This class contains base model for Inventory table.
-
-    :Attributes:
-    - `item_name (str)`: Name of item.
-    - `quantity (int)`: Quantity of item.
-    - `unit_price (float)`: Price of item per unit.
-    - `minimum_threshold (int)`: Minimum threshold for item.
-    - `category (InventoryCategory)`: Category of item.
-
-    """
-
-    item_name: str = Field(max_length=255, unique=True, index=True)
-    quantity: int = Field(gt=0)
-    unit_price: float = Field(gt=0)
-    minimum_threshold: int = Field(gt=0)
-    category: InventoryCategory
-
-
-class Inventory(Base, InventoryBase, table=True):
-    """Inventory Table.
-
-    Description:
-    - This class contains model for Supplier table.
-
-    :Attributes:
-    - `id (int)`: Unique identifier for supplier.
-    - `item_name (str)`: Name of item.
-    - `quantity (int)`: Quantity of item.
-    - `unit_price (float)`: Price of item per unit.
-    - `minimum_threshold (int)`: Minimum threshold for item.
-    - `category (InventoryCategory)`: Category of item.
-    - `created_at (datetime)`: Timestamp when inventory was created.
-    - `updated_at (datetime)`: Timestamp when inventory was last updated.
-
-    """
-
-    suppliers: list[Supplier] = Relationship(
-        back_populates="inventories", link_model=InventorySupplierLink
+    item_name: str = Field(max_length=255)
+    quantity: int
+    unit_price: float = Field(max_digits=10, decimal_places=2)
+    minimum_stock_level: int
+    category: str = Field(max_length=50)
+    reorder_level: int
+    supplier_id: int = Field(foreign_key="supplier.id")
+    supplier: "Supplier" = Relationship(back_populates="inventory_items")
+    estimates: list["Estimate"] = Relationship(
+        back_populates="inventories", link_model=InventoryEstimate
     )
