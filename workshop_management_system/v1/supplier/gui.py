@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,  # Add this import
     QMessageBox,
     QPushButton,
     QSizePolicy,
