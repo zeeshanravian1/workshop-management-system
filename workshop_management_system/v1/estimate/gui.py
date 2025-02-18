@@ -366,17 +366,32 @@ class EstimateDialog(QDialog):
 
     def get_data(self):
         """Get the data from the dialog."""
-        data = {
-            "total_amount": float(self.total_amount_input.text()),
+        if not self.total_amount_input.text().strip():
+            QMessageBox.warning(
+                self, "Validation Error", "Total amount cannot be empty!"
+            )
+            return None
+
+        try:
+            total_amount = float(self.total_amount_input.text().strip())
+        except ValueError:
+            QMessageBox.warning(
+                self,
+                "Validation Error",
+                "Total amount must be a valid number!",
+            )
+            return None
+
+        return {
+            "total_amount": total_amount,
             "status": self.status_input.text(),
             "description": self.description_input.text(),
             "valid_until": self.valid_until_input.text(),
             "vehicle_id": self.vehicle_id_input.text(),
             "job_card_id": self.job_card_id_input.text(),
             "customer_id": self.customer_id_input.text(),
+            "inventory_items": self.selected_items,
         }
-        data["inventory_items"] = self.selected_items
-        return data
 
 
 class EstimateGUI(QWidget):
@@ -657,71 +672,72 @@ class EstimateGUI(QWidget):
         dialog = EstimateDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             data = dialog.get_data()
-            try:
-                with Session(engine) as session:
-                    vehicle = session.exec(
-                        select(Vehicle).where(
-                            Vehicle.id == int(data["vehicle_id"])
-                        )
-                    ).first()
-                    if not vehicle:
-                        raise ValueError("Vehicle not found")
-
-                    new_estimate = Estimate(
-                        estimate_date=datetime.now(),
-                        total_estimate_amount=data["total_amount"],
-                        status=data["status"],
-                        description=data["description"],
-                        valid_until=datetime.strptime(
-                            data["valid_until"], "%Y-%m-%d"
-                        ),
-                        customer_id=vehicle.customer_id,
-                        vehicle_id=vehicle.id,
-                        job_card_id=int(data["job_card_id"])
-                        if data["job_card_id"]
-                        else None,
-                    )
-                    session.add(new_estimate)
-                    session.flush()  # Get the new estimate ID
-
-                    # Add inventory items with quantity tracking
-                    total_amount = 0
-                    for item in data["inventory_items"]:
-                        inventory = session.exec(
-                            select(Inventory).where(
-                                Inventory.item_name == item["item_name"]
+            if data is not None:  # Only proceed if data is valid
+                try:
+                    with Session(engine) as session:
+                        vehicle = session.exec(
+                            select(Vehicle).where(
+                                Vehicle.id == int(data["vehicle_id"])
                             )
                         ).first()
+                        if not vehicle:
+                            raise ValueError("Vehicle not found")
 
-                        if inventory:
-                            # Update inventory quantity
-                            inventory.quantity -= item["quantity"]
+                        new_estimate = Estimate(
+                            estimate_date=datetime.now(),
+                            total_estimate_amount=data["total_amount"],
+                            status=data["status"],
+                            description=data["description"],
+                            valid_until=datetime.strptime(
+                                data["valid_until"], "%Y-%m-%d"
+                            ),
+                            customer_id=vehicle.customer_id,
+                            vehicle_id=vehicle.id,
+                            job_card_id=int(data["job_card_id"])
+                            if data["job_card_id"]
+                            else None,
+                        )
+                        session.add(new_estimate)
+                        session.flush()  # Get the new estimate ID
 
-                            # Create association
-                            association = InventoryEstimate(
-                                inventory_id=inventory.id,
-                                estimate_id=new_estimate.id,
-                                quantity_used=item["quantity"],
-                                unit_price_at_time=item["unit_price"],
-                            )
-                            session.add(association)
+                        # Add inventory items with quantity tracking
+                        total_amount = 0
+                        for item in data["inventory_items"]:
+                            inventory = session.exec(
+                                select(Inventory).where(
+                                    Inventory.item_name == item["item_name"]
+                                )
+                            ).first()
 
-                            # Update total amount
-                            total_amount += (
-                                item["quantity"] * item["unit_price"]
-                            )
+                            if inventory:
+                                # Update inventory quantity
+                                inventory.quantity -= item["quantity"]
 
-                    # Update estimate total amount
-                    new_estimate.total_estimate_amount = total_amount
-                    session.commit()
-                    QMessageBox.information(
-                        self, "Success", "Estimate added successfully!"
+                                # Create association
+                                association = InventoryEstimate(
+                                    inventory_id=inventory.id,
+                                    estimate_id=new_estimate.id,
+                                    quantity_used=item["quantity"],
+                                    unit_price_at_time=item["unit_price"],
+                                )
+                                session.add(association)
+
+                                # Update total amount
+                                total_amount += (
+                                    item["quantity"] * item["unit_price"]
+                                )
+
+                        # Update estimate total amount
+                        new_estimate.total_estimate_amount = total_amount
+                        session.commit()
+                        QMessageBox.information(
+                            self, "Success", "Estimate added successfully!"
+                        )
+                        self.load_estimates()
+                except Exception as e:
+                    QMessageBox.critical(
+                        self, "Error", f"Failed to add estimate: {e!s}"
                     )
-                    self.load_estimates()
-            except Exception as e:
-                QMessageBox.critical(
-                    self, "Error", f"Failed to add estimate: {e!s}"
-                )
 
     def update_estimate(self) -> None:
         """Update an existing estimate."""
