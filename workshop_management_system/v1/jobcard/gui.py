@@ -110,15 +110,57 @@ class JobCardDialog(QDialog):
                 self, "Error", f"Failed to load vehicles: {e!s}"
             )
 
-    def get_data(self):
-        """Get the data from the dialog."""
-        return {
-            "vehicle_id": self.vehicle_id_input.currentData(),
-            "service_date": self.service_date_input.text(),
-            "status": self.status_input.text(),
-            "total_amount": float(self.total_amount_input.text()),
-            "description": self.description_input.text(),
-        }
+    def get_data(self) -> dict:
+        """Get the data from the dialog fields."""
+        try:
+            # Get and validate vehicle_id
+            vehicle_id = self.vehicle_id_input.currentData()
+            if not vehicle_id:
+                raise ValueError("Please select a vehicle")
+
+            # Get and validate service date
+            service_date = self.service_date_input.text().strip()
+            if not service_date:
+                raise ValueError("Service date is required")
+            try:
+                datetime.strptime(service_date, "%Y-%m-%d")
+            except ValueError:
+                raise ValueError("Invalid date format. Use YYYY-MM-DD")
+
+            # Get and validate status
+            status = self.status_input.text().strip()
+            if not status:
+                raise ValueError("Status is required")
+
+            # Get and validate total amount
+            total_amount = self.total_amount_input.text().strip()
+            try:
+                total_amount = float(total_amount) if total_amount else 0.0
+            except ValueError:
+                raise ValueError("Total amount must be a valid number")
+
+            # Get description
+            description = self.description_input.text().strip()
+
+            return {
+                "vehicle_id": vehicle_id,
+                "service_date": service_date,
+                "status": status,
+                "total_amount": total_amount,
+                "description": description,
+            }
+        except ValueError as e:
+            QMessageBox.critical(self, "Input Error", str(e))
+            raise
+
+    def accept(self) -> None:
+        """Override accept to add validation."""
+        try:
+            self.get_data()  # Validate data before accepting
+            super().accept()
+        except ValueError:
+            # Error message already shown by get_data()
+            pass
 
 
 class JobCardGUI(QWidget):
