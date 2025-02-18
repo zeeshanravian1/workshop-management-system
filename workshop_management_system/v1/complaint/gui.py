@@ -113,6 +113,23 @@ class ComplaintGUI(QWidget):
         """Initialize the Complaint GUI."""
         super().__init__(parent)
         self.parent_widget = parent
+        # Add pagination dictionary to match base model
+        self.pagination = {
+            "current_page": 1,
+            "limit": 15,
+            "total_pages": 0,
+            "total_records": 0,
+            "next_record_id": None,
+            "previous_record_id": None,
+            "records": [],
+        }
+        # Keep compatibility properties
+        self.page_size = self.pagination["limit"]
+        self.current_page = self.pagination["current_page"]
+        self.all_complaints = []
+        self.filtered_complaints = []
+
+        # Update theme to match customer/vehicle GUI
         self.setStyleSheet("""
             QWidget {
                 background-color: white;
@@ -121,65 +138,30 @@ class ComplaintGUI(QWidget):
             QPushButton {
                 padding: 10px;
                 font-size: 14px;
-                font-weight: bold;
-                background-color: #4CAF50;
+                background-color: skyblue;
                 color: white;
-                border: none;
                 border-radius: 5px;
                 min-width: 120px;
                 margin: 5px;
             }
             QPushButton:hover {
-                background-color: #45a049;
-                min-width: 125px;
+                background-color: #ADD8E6;
+                margin: 0px;
             }
             QTableWidget {
                 background-color: white;
-                color: black;
-                border: 1px solid #ddd;
                 border-radius: 5px;
                 padding: 5px;
             }
-            QTableWidget::item:alternate {
-                background-color: #f5f5f5;
-            }
             QTableWidget::item {
-                background-color: white;
                 padding: 5px;
+                color: black;
+                background-color: white;
             }
             QTableWidget::item:selected {
-                background-color: #90EE90;  /* Light green */
+                background-color: #e6f3ff;
                 color: black;
             }
-            QTableWidget::item:selected:active {
-                background-color: #4CAF50;  /* Darker green when active */
-                color: white;
-            }
-            QLabel {
-                color: black;
-            }
-            QTextEdit {
-                padding: 8px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                background-color: white;
-                color: black;
-            }
-            QFrame {
-                background-color: white;
-                border: 1px solid #ddd;
-            }
-            /*
-            QHeaderView::section {
-                height: 30px;
-                background-color: #4CAF50;
-                color: white;
-                padding: 8px;
-                font-size: 14px;
-                font-weight: bold;
-                border: none;
-            }
-            */
         """)
 
         self.complaint_view = ComplaintView(model=Complaint)
@@ -245,38 +227,43 @@ class ComplaintGUI(QWidget):
         )
         self.complaint_table.setStyleSheet("""
             QTableWidget {
+                border: 1px solid black;
                 background-color: white;
                 border-radius: 5px;
                 padding: 5px;
+                margin: 0px;
             }
             QTableWidget::item {
-                padding: 5px;
-                color: black;
-                background-color: white;
                 border: none;
+                padding: 5px;
             }
             QTableWidget::item:selected {
-                background-color: green;
-                color: white;
-            }
-            QHeaderView::section {
-                background-color: white;
+                background-color: #e6f3ff;
                 color: black;
-                padding: 5px;
+            }
+            QScrollBar:vertical {
                 border: none;
+                background: #f0f0f0;
+                width: 10px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #c1c1c1;
+                min-height: 30px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #a8a8a8;
             }
         """)
-
-        self.complaint_table.setEditTriggers(
-            QTableWidget.EditTrigger.NoEditTriggers
-        )
-        self.complaint_table.setSelectionMode(
-            QTableWidget.SelectionMode.NoSelection
-        )
+        self.complaint_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.complaint_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         self.complaint_table.horizontalHeader().setStretchLastSection(True)
         self.complaint_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
         )
+        self.complaint_table.verticalHeader().setVisible(False)
+        self.complaint_table.horizontalHeader().setVisible(False)
 
         # Safer way to handle table stretching
         header = self.complaint_table.horizontalHeader()
@@ -313,6 +300,53 @@ class ComplaintGUI(QWidget):
             button_layout.addWidget(button)
 
         main_layout.addWidget(button_frame)
+
+        # Add pagination frame
+        pagination_frame = QFrame()
+        pagination_layout = QHBoxLayout(pagination_frame)
+        pagination_layout.setSpacing(5)
+
+        # Previous button
+        self.prev_button = QPushButton("Previous")
+        self.prev_button.clicked.connect(self.previous_page)
+        self.prev_button.setStyleSheet("""
+            QPushButton {
+                background-color: skyblue;
+                padding: 8px 15px;
+                border-radius: 5px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #ADD8E6;
+            }
+        """)
+
+        # Page number buttons container
+        self.page_buttons_layout = QHBoxLayout()
+        self.page_buttons_layout.setSpacing(5)
+
+        # Next button
+        self.next_button = QPushButton("Next")
+        self.next_button.clicked.connect(self.next_page)
+        self.next_button.setStyleSheet("""
+            QPushButton {
+                background-color: skyblue;
+                padding: 8px 15px;
+                border-radius: 5px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #ADD8E6;
+            }
+        """)
+
+        pagination_layout.addWidget(self.prev_button)
+        pagination_layout.addLayout(self.page_buttons_layout)
+        pagination_layout.addWidget(self.next_button)
+        pagination_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        main_layout.addWidget(pagination_frame)
+
         self.load_complaints()
 
     def back_to_home(self) -> None:
@@ -395,81 +429,65 @@ class ComplaintGUI(QWidget):
                 return None
         return None
 
-    def load_complaints(self) -> None:
-        """Load complaints from database."""
+    def load_complaints(self, refresh_all=True) -> None:
+        """Load complaints with pagination."""
         try:
             with Session(engine) as session:
-                complaints = self.complaint_view.read_all(db_session=session)
-                self.complaint_table.setRowCount(len(complaints) + 1)
-                self.complaint_table.setColumnCount(5)
+                if refresh_all:
+                    self.all_complaints = self.complaint_view.read_all(
+                        db_session=session
+                    )
+                    self.filtered_complaints = self.all_complaints.copy()
 
-                # Hide the default headers
-                self.complaint_table.horizontalHeader().hide()
-                self.complaint_table.verticalHeader().hide()
+                total_records = len(self.filtered_complaints)
+                total_pages = (
+                    total_records + self.pagination["limit"] - 1
+                ) // self.pagination["limit"]
 
-                # Adjusted column widths - made status even shorter
-                self.complaint_table.setColumnWidth(0, 60)  # ID
-                self.complaint_table.setColumnWidth(1, 160)  # Customer
-                self.complaint_table.setColumnWidth(
-                    2, 600
-                )  # Description (even longer)
-                self.complaint_table.setColumnWidth(3, 70)  # Priority
-                self.complaint_table.setColumnWidth(
-                    4, 40
-                )  # Status (much shorter)
-
-                # Connect selection changed signal
-                self.complaint_table.itemSelectionChanged.connect(
-                    self.on_row_selected
+                # Update pagination state
+                self.pagination.update(
+                    {
+                        "total_records": total_records,
+                        "total_pages": total_pages,
+                    }
                 )
 
-                # Add header row as first row of table with grey background
-                headers = [
-                    "ID",
-                    "Customer",
-                    "Description",
-                    "Priority",
-                    "Status",
+                # Calculate page data
+                start_idx = (
+                    self.pagination["current_page"] - 1
+                ) * self.pagination["limit"]
+                end_idx = start_idx + self.pagination["limit"]
+                current_page_records = self.filtered_complaints[
+                    start_idx:end_idx
                 ]
-                for col, header in enumerate(headers):
-                    item = QTableWidgetItem(header)
-                    item.setBackground(
-                        Qt.GlobalColor.lightGray
-                    )  # Set grey background
-                    font = item.font()
-                    font.setBold(True)
-                    item.setFont(font)
-                    self.complaint_table.setItem(0, col, item)
+                self.pagination["records"] = current_page_records
 
-                # Set the height of the first row
-                self.complaint_table.setRowHeight(0, 40)
+                # Update next/previous record IDs
+                if end_idx < total_records:
+                    self.pagination["next_record_id"] = (
+                        self.filtered_complaints[end_idx].id
+                    )
+                else:
+                    self.pagination["next_record_id"] = None
 
-                # Populate data rows with alternating colors
-                for row, complaint in enumerate(complaints, start=1):
-                    # Set background color for entire row
-                    for col in range(5):
-                        item = QTableWidgetItem()
-                        if row % 2 == 0:
-                            item.setBackground(Qt.GlobalColor.white)
-                        else:
-                            item.setBackground(Qt.GlobalColor.lightGray)
-                        self.complaint_table.setItem(row, col, item)
+                if start_idx > 0:
+                    self.pagination["previous_record_id"] = (
+                        self.filtered_complaints[start_idx - 1].id
+                    )
+                else:
+                    self.pagination["previous_record_id"] = None
 
-                    # Now set the actual data
-                    customer = session.get(Customer, complaint.customer_id)
-                    self.complaint_table.item(row, 0).setText(
-                        str(complaint.id)
-                    )
-                    self.complaint_table.item(row, 1).setText(
-                        customer.name if customer else ""
-                    )
-                    self.complaint_table.item(row, 2).setText(
-                        complaint.description
-                    )
-                    self.complaint_table.item(row, 3).setText(
-                        complaint.priority
-                    )
-                    self.complaint_table.item(row, 4).setText(complaint.status)
+                # Update table content
+                self._update_table_data(current_page_records)
+
+                # Update pagination UI
+                self.update_pagination_buttons(total_pages)
+                self.prev_button.setEnabled(
+                    self.pagination["previous_record_id"] is not None
+                )
+                self.next_button.setEnabled(
+                    self.pagination["next_record_id"] is not None
+                )
 
         except Exception as e:
             QMessageBox.critical(
@@ -674,6 +692,175 @@ class ComplaintGUI(QWidget):
                     show_row = False
 
             self.complaint_table.setRowHidden(row, not show_row)
+
+    def update_pagination_buttons(self, total_pages: int) -> None:
+        """Update the pagination buttons."""
+        # Clear existing buttons
+        while self.page_buttons_layout.count():
+            item = self.page_buttons_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        current_page = self.pagination["current_page"]
+
+        # Always show first page
+        self.add_page_button(1)
+
+        if total_pages > 7:
+            # Show ellipsis after first page if needed
+            if current_page > 3:
+                self.page_buttons_layout.addWidget(self._create_ellipsis())
+
+            # Show pages around current page
+            if current_page <= 3:
+                # Near start - show first few pages
+                for page in range(2, 6):
+                    self.add_page_button(page)
+            elif current_page >= total_pages - 2:
+                # Near end - show last few pages
+                for page in range(total_pages - 4, total_pages):
+                    self.add_page_button(page)
+            else:
+                # In middle - show pages around current
+                for page in range(current_page - 2, current_page + 3):
+                    if 1 < page < total_pages:
+                        self.add_page_button(page)
+
+            # Show ellipsis before last page if needed
+            if current_page < total_pages - 3:
+                self.page_buttons_layout.addWidget(self._create_ellipsis())
+        else:
+            # For small number of pages, show all pages
+            for page in range(2, total_pages + 1):
+                self.add_page_button(page)
+
+        # Always show last page if more than one page
+        if total_pages > 1:
+            self.add_page_button(total_pages)
+
+    def _create_ellipsis(self):
+        """Create ellipsis button for pagination."""
+        ellipsis = QPushButton("...")
+        ellipsis.setEnabled(False)
+        ellipsis.setFixedSize(40, 40)
+        ellipsis.setStyleSheet("""
+            QPushButton {
+                background: none;
+                border: none;
+                color: #666;
+                font-weight: bold;
+                min-width: 40px;
+            }
+        """)
+        return ellipsis
+
+    def add_page_button(self, page_num: int) -> None:
+        """Add a single page button."""
+        button = QPushButton(str(page_num))
+        button.setFixedSize(40, 40)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.setMinimumWidth(40)
+        button.setMaximumWidth(40)
+
+        if page_num == self.pagination["current_page"]:
+            button.setStyleSheet("""
+                QPushButton {
+                    background-color: skyblue;
+                    color: white;
+                    border-radius: 20px;
+                    font-weight: bold;
+                    min-width: 40px;
+                    max-width: 40px;
+                }
+            """)
+        else:
+            button.setStyleSheet("""
+                QPushButton {
+                    background-color: white;
+                    color: black;
+                    border: 1px solid #ddd;
+                    border-radius: 20px;
+                    min-width: 40px;
+                    max-width: 40px;
+                }
+                QPushButton:hover {
+                    background-color: #f0f0f0;
+                }
+            """)
+
+        button.clicked.connect(lambda checked, p=page_num: self.go_to_page(p))
+        self.page_buttons_layout.addWidget(button)
+
+    def next_page(self) -> None:
+        """Load the next page of complaints."""
+        if self.pagination["next_record_id"] is not None:
+            self.pagination["current_page"] += 1
+            self.current_page = self.pagination["current_page"]  # Keep in sync
+            self.load_complaints(refresh_all=False)
+
+    def previous_page(self) -> None:
+        """Load the previous page of complaints."""
+        if self.pagination["previous_record_id"] is not None:
+            self.pagination["current_page"] -= 1
+            self.current_page = self.pagination["current_page"]  # Keep in sync
+            self.load_complaints(refresh_all=False)
+
+    def go_to_page(self, page_number: int) -> None:
+        """Navigate to specific page number."""
+        if (
+            1 <= page_number <= self.pagination["total_pages"]
+            and page_number != self.pagination["current_page"]
+        ):
+            self.pagination["current_page"] = page_number
+            self.current_page = page_number  # Keep in sync
+            self.load_complaints(refresh_all=False)
+
+    def _update_table_data(self, records):
+        """Update table data while preserving table properties."""
+        self.complaint_table.setRowCount(len(records) + 1)
+        self.complaint_table.setColumnCount(5)
+
+        # Set headers
+        headers = ["ID", "Customer", "Description", "Priority", "Status"]
+        for col, header in enumerate(headers):
+            item = QTableWidgetItem(header)
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            self.complaint_table.setItem(0, col, item)
+
+        # Populate data
+        for row, complaint in enumerate(records, start=1):
+            with Session(engine) as session:
+                customer = session.get(Customer, complaint.customer_id)
+                self.complaint_table.setItem(
+                    row, 0, QTableWidgetItem(str(complaint.id))
+                )
+                self.complaint_table.setItem(
+                    row, 1, QTableWidgetItem(customer.name if customer else "")
+                )
+                self.complaint_table.setItem(
+                    row, 2, QTableWidgetItem(complaint.description)
+                )
+                self.complaint_table.setItem(
+                    row, 3, QTableWidgetItem(complaint.priority)
+                )
+                self.complaint_table.setItem(
+                    row, 4, QTableWidgetItem(complaint.status)
+                )
+
+        # Maintain table appearance
+        self.complaint_table.resizeColumnsToContents()
+        self.complaint_table.horizontalHeader().setStretchLastSection(True)
+        self.complaint_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+
+        # Set consistent row heights
+        row_height = 40
+        for row in range(self.complaint_table.rowCount()):
+            self.complaint_table.setRowHeight(row, row_height)
 
 
 if __name__ == "__main__":

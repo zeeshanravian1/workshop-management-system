@@ -11,21 +11,21 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QApplication,
-    QComboBox,  # Add this import
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
     QFrame,
     QHBoxLayout,
-    QHeaderView,
+    QHeaderView,  # Add this
     QLabel,
     QLineEdit,
-    QMenu,  # Add this import
+    QMenu,  # Add this
     QMessageBox,
     QPushButton,
     QSizePolicy,
     QTableWidget,
-    QTableWidgetItem,
+    QTableWidgetItem,  # Add this
     QVBoxLayout,
     QWidget,
 )
@@ -138,7 +138,7 @@ class SupplierGUI(QWidget):
         """Initialize the Supplier GUI."""
         super().__init__(parent)
         self.parent_widget = parent
-        # Update pagination to match PaginationBase
+        # Replace existing pagination properties with new pagination dictionary
         self.pagination = {
             "current_page": 1,
             "limit": 15,
@@ -148,9 +148,11 @@ class SupplierGUI(QWidget):
             "previous_record_id": None,
             "records": [],
         }
-        # Keep original properties for compatibility
+        # Keep compatibility properties
         self.page_size = self.pagination["limit"]
         self.current_page = self.pagination["current_page"]
+
+        self.total_records = 0
         self.all_suppliers = []
         self.filtered_suppliers = []
         self.setStyleSheet("""
@@ -413,9 +415,8 @@ class SupplierGUI(QWidget):
                 )
             ]
 
-        self.pagination["current_page"] = 1
-        self.current_page = 1  # Keep in sync
-        self.pagination["total_records"] = len(self.filtered_suppliers)
+        self.current_page = 1
+        self.total_records = len(self.filtered_suppliers)
         self.load_suppliers(refresh_all=False)
 
     def load_suppliers(self, refresh_all=True) -> None:
@@ -466,10 +467,8 @@ class SupplierGUI(QWidget):
                 else:
                     self.pagination["previous_record_id"] = None
 
-                # Update table content
+                # Update table content and buttons
                 self._update_table_data(current_page_records)
-
-                # Update pagination UI
                 self.update_pagination_buttons(total_pages)
                 self.prev_button.setEnabled(
                     self.pagination["previous_record_id"] is not None
@@ -482,174 +481,6 @@ class SupplierGUI(QWidget):
             QMessageBox.critical(
                 self, "Error", f"Failed to load suppliers: {e!s}"
             )
-
-    def _update_table_data(self, records):
-        """Update table data while preserving table properties."""
-        self.supplier_table.setRowCount(len(records) + 1)
-        self.supplier_table.setColumnCount(5)
-
-        # Set headers
-        headers = ["ID", "Name", "Email", "Contact Number", "Address"]
-        for col, header in enumerate(headers):
-            item = QTableWidgetItem(header)
-            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-            font = item.font()
-            font.setBold(True)
-            item.setFont(font)
-            self.supplier_table.setItem(0, col, item)
-
-        # Populate data
-        for row, supplier in enumerate(records, start=1):
-            self.supplier_table.setItem(
-                row, 0, QTableWidgetItem(str(supplier.id))
-            )
-            self.supplier_table.setItem(
-                row, 1, QTableWidgetItem(supplier.name)
-            )
-            self.supplier_table.setItem(
-                row, 2, QTableWidgetItem(supplier.email)
-            )
-            self.supplier_table.setItem(
-                row, 3, QTableWidgetItem(supplier.contact_number)
-            )
-            self.supplier_table.setItem(
-                row, 4, QTableWidgetItem(supplier.address)
-            )
-
-        # Maintain table appearance
-        self.supplier_table.resizeColumnsToContents()
-        self.supplier_table.horizontalHeader().setStretchLastSection(True)
-        self.supplier_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
-
-        # Set consistent row heights
-        row_height = 40
-        for row in range(self.supplier_table.rowCount()):
-            self.supplier_table.setRowHeight(row, row_height)
-
-    def update_pagination_buttons(self, total_pages: int) -> None:
-        """Update the pagination buttons."""
-        # Clear existing buttons
-        while self.page_buttons_layout.count():
-            item = self.page_buttons_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-        current_page = self.pagination["current_page"]
-
-        # Always show first page
-        self.add_page_button(1)
-
-        if total_pages > 7:
-            # Show ellipsis after first page if needed
-            if current_page > 3:
-                self.page_buttons_layout.addWidget(self._create_ellipsis())
-
-            # Show pages around current page
-            if current_page <= 3:
-                # Near start - show first few pages
-                for page in range(2, 6):
-                    self.add_page_button(page)
-            elif current_page >= total_pages - 2:
-                # Near end - show last few pages
-                for page in range(total_pages - 4, total_pages):
-                    self.add_page_button(page)
-            else:
-                # In middle - show pages around current
-                for page in range(current_page - 2, current_page + 3):
-                    if 1 < page < total_pages:
-                        self.add_page_button(page)
-
-            # Show ellipsis before last page if needed
-            if current_page < total_pages - 3:
-                self.page_buttons_layout.addWidget(self._create_ellipsis())
-
-        else:
-            # For small number of pages, show all pages
-            for page in range(2, total_pages + 1):
-                self.add_page_button(page)
-
-        # Always show last page if there is more than one page
-        if total_pages > 1:
-            self.add_page_button(total_pages)
-
-    def _create_ellipsis(self):
-        """Create ellipsis button for pagination."""
-        ellipsis = QPushButton("...")
-        ellipsis.setEnabled(False)
-        ellipsis.setFixedSize(40, 40)
-        ellipsis.setStyleSheet("""
-            QPushButton {
-                background: none;
-                border: none;
-                color: #666;
-                font-weight: bold;
-                min-width: 40px;
-            }
-        """)
-        return ellipsis
-
-    def add_page_button(self, page_num: int) -> None:
-        """Add a single page button."""
-        button = QPushButton(str(page_num))
-        button.setFixedSize(40, 40)
-        button.setCursor(Qt.CursorShape.PointingHandCursor)
-        button.setMinimumWidth(40)
-        button.setMaximumWidth(40)
-
-        if page_num == self.pagination["current_page"]:
-            button.setStyleSheet("""
-                QPushButton {
-                    background-color: skyblue;
-                    color: white;
-                    border-radius: 20px;
-                    font-weight: bold;
-                    min-width: 40px;
-                    max-width: 40px;
-                }
-            """)
-        else:
-            button.setStyleSheet("""
-                QPushButton {
-                    background-color: white;
-                    color: black;
-                    border: 1px solid #ddd;
-                    border-radius: 20px;
-                    min-width: 40px;
-                    max-width: 40px;
-                }
-                QPushButton:hover {
-                    background-color: #f0f0f0;
-                }
-            """)
-
-        button.clicked.connect(lambda checked, p=page_num: self.go_to_page(p))
-        self.page_buttons_layout.addWidget(button)
-
-    def next_page(self) -> None:
-        """Load the next page of suppliers."""
-        if self.pagination["next_record_id"] is not None:
-            self.pagination["current_page"] += 1
-            self.current_page = self.pagination["current_page"]  # Keep in sync
-            self.load_suppliers(refresh_all=False)
-
-    def previous_page(self) -> None:
-        """Load the previous page of suppliers."""
-        if self.pagination["previous_record_id"] is not None:
-            self.pagination["current_page"] -= 1
-            self.current_page = self.pagination["current_page"]  # Keep in sync
-            self.load_suppliers(refresh_all=False)
-
-    def go_to_page(self, page_number):
-        """Navigate to specific page number."""
-        if (
-            1 <= page_number <= self.pagination["total_pages"]
-            and page_number != self.pagination["current_page"]
-        ):
-            self.pagination["current_page"] = page_number
-            self.current_page = page_number  # Keep in sync
-            self.load_suppliers(refresh_all=False)
 
     def add_supplier(self) -> None:
         """Add a new supplier to the database."""
@@ -765,6 +596,128 @@ class SupplierGUI(QWidget):
                 self, "Error", f"Failed to delete supplier: {e!s}"
             )
 
+    def update_pagination_buttons(self, total_pages: int) -> None:
+        """Update the pagination buttons."""
+        # Clear existing buttons
+        while self.page_buttons_layout.count():
+            item = self.page_buttons_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        current_page = self.pagination["current_page"]
+
+        # Always show first page
+        self.add_page_button(1)
+
+        if total_pages > 7:
+            # Show ellipsis after first page if needed
+            if current_page > 3:
+                self.page_buttons_layout.addWidget(self._create_ellipsis())
+
+            # Show pages around current page
+            if current_page <= 3:
+                # Near start - show first few pages
+                for page in range(2, 6):
+                    self.add_page_button(page)
+            elif current_page >= total_pages - 2:
+                # Near end - show last few pages
+                for page in range(total_pages - 4, total_pages):
+                    self.add_page_button(page)
+            else:
+                # In middle - show pages around current
+                for page in range(current_page - 2, current_page + 3):
+                    if 1 < page < total_pages:
+                        self.add_page_button(page)
+
+            # Show ellipsis before last page if needed
+            if current_page < total_pages - 3:
+                self.page_buttons_layout.addWidget(self._create_ellipsis())
+        else:
+            # For small number of pages, show all pages
+            for page in range(2, total_pages + 1):
+                self.add_page_button(page)
+
+        # Always show last page if more than one page
+        if total_pages > 1:
+            self.add_page_button(total_pages)
+
+    def _create_ellipsis(self):
+        """Create ellipsis button for pagination."""
+        ellipsis = QPushButton("...")
+        ellipsis.setEnabled(False)
+        ellipsis.setFixedSize(40, 40)
+        ellipsis.setStyleSheet("""
+            QPushButton {
+                background: none;
+                border: none;
+                color: #666;
+                font-weight: bold;
+                min-width: 40px;
+            }
+        """)
+        return ellipsis
+
+    def add_page_button(self, page_num: int) -> None:
+        """Add a single page button."""
+        button = QPushButton(str(page_num))
+        button.setFixedSize(40, 40)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.setMinimumWidth(40)
+        button.setMaximumWidth(40)
+
+        if page_num == self.pagination["current_page"]:
+            button.setStyleSheet("""
+                QPushButton {
+                    background-color: skyblue;
+                    color: white;
+                    border-radius: 20px;
+                    font-weight: bold;
+                    min-width: 40px;
+                    max-width: 40px;
+                }
+            """)
+        else:
+            button.setStyleSheet("""
+                QPushButton {
+                    background-color: white;
+                    color: black;
+                    border: 1px solid #ddd;
+                    border-radius: 20px;
+                    min-width: 40px;
+                    max-width: 40px;
+                }
+                QPushButton:hover {
+                    background-color: #f0f0f0;
+                }
+            """)
+
+        button.clicked.connect(lambda checked, p=page_num: self.go_to_page(p))
+        self.page_buttons_layout.addWidget(button)
+
+    def next_page(self) -> None:
+        """Load the next page of suppliers."""
+        if self.pagination["next_record_id"] is not None:
+            self.pagination["current_page"] += 1
+            self.current_page = self.pagination["current_page"]  # Keep in sync
+            self.load_suppliers(refresh_all=False)
+
+    def previous_page(self) -> None:
+        """Load the previous page of suppliers."""
+        if self.pagination["previous_record_id"] is not None:
+            self.pagination["current_page"] -= 1
+            self.current_page = self.pagination["current_page"]  # Keep in sync
+            self.load_suppliers(refresh_all=False)
+
+    def go_to_page(self, page_number: int) -> None:
+        """Navigate to specific page number."""
+        if (
+            1 <= page_number <= self.pagination["total_pages"]
+            and page_number != self.pagination["current_page"]
+        ):
+            self.pagination["current_page"] = page_number
+            self.current_page = page_number  # Keep in sync
+            self.load_suppliers(refresh_all=False)
+
     def show_context_menu(self, position):
         """Show context menu for table row."""
         row = self.supplier_table.rowAt(position.y())
@@ -809,6 +762,51 @@ class SupplierGUI(QWidget):
                 self.update_supplier()
             elif action == delete_action:
                 self.delete_supplier()
+
+    def _update_table_data(self, records):
+        """Update table data while preserving table properties."""
+        self.supplier_table.setRowCount(len(records) + 1)  # +1 for header
+        self.supplier_table.setColumnCount(5)
+
+        # Set headers
+        headers = ["ID", "Name", "Email", "Contact Number", "Address"]
+        for col, header in enumerate(headers):
+            item = QTableWidgetItem(header)
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            self.supplier_table.setItem(0, col, item)
+
+        # Populate data
+        for row, supplier in enumerate(records, start=1):
+            self.supplier_table.setItem(
+                row, 0, QTableWidgetItem(str(supplier.id))
+            )
+            self.supplier_table.setItem(
+                row, 1, QTableWidgetItem(supplier.name)
+            )
+            self.supplier_table.setItem(
+                row, 2, QTableWidgetItem(supplier.email)
+            )
+            self.supplier_table.setItem(
+                row, 3, QTableWidgetItem(supplier.contact_number)
+            )
+            self.supplier_table.setItem(
+                row, 4, QTableWidgetItem(supplier.address)
+            )
+
+        # Maintain table appearance
+        self.supplier_table.resizeColumnsToContents()
+        self.supplier_table.horizontalHeader().setStretchLastSection(True)
+        self.supplier_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+
+        # Set consistent row heights
+        row_height = 40
+        for row in range(self.supplier_table.rowCount()):
+            self.supplier_table.setRowHeight(row, row_height)
 
 
 if __name__ == "__main__":
