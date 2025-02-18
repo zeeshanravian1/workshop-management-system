@@ -1,10 +1,11 @@
 [project]
 name = "workshop-management-system"
 version = "0.1.0"
-description = ""
+description = "Workshop Management System"
 authors = [
     {name = "Zeeshan Asim",email = "zeeshanravian1@gmail.com"}
 ]
+license = {text = "MIT"}
 readme = "README.md"
 
 requires-python = ">=3.13,<3.14"
@@ -15,7 +16,7 @@ dependencies = [
     "pydantic[email] (>=2.10.6,<3.0.0)",
     "pydantic-extra-types (>=2.10.2,<3.0.0)",
     "alembic (>=1.14.1,<2.0.0)",
-    "phonenumbers (>=8.13.54,<9.0.0)",
+    "phonenumbers (>=8.13.55,<9.0.0)",
     "pyqt6 (>=6.8.1,<7.0.0)",
     "pyinstaller (>=6.12.0,<7.0.0)"
 ]
@@ -34,8 +35,8 @@ black = "^25.1.0"
 pyupgrade = "^3.19.1"
 ruff = "^0.9.6"
 skjold = "^0.6.2"
-bandit = "^1.8.2"
-coverage = "^7.6.11"
+bandit = "^1.8.3"
+coverage = "^7.6.12"
 logfire = "^3.5.3"
 gitlint = "^0.19.1"
 

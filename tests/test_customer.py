@@ -5,14 +5,13 @@ Description:
 
 """
 
-from collections.abc import Sequence
-
 import pytest
 from pydantic import ValidationError
 from pydantic_extra_types.phone_numbers import PhoneNumber
 from sqlalchemy.exc import IntegrityError
 
 from tests.conftest import TestSetup
+from workshop_management_system.v1.base.model import PaginationBase
 from workshop_management_system.v1.customer.model import Customer, CustomerBase
 from workshop_management_system.v1.customer.view import CustomerView
 
@@ -35,6 +34,7 @@ class TestCustomer(TestSetup):
     customer_view: CustomerView
     test_customer_1: CustomerBase
     test_customer_2: CustomerBase
+    test_customer_3: CustomerBase
 
     @pytest.fixture(autouse=True)
     def setup_method(self) -> None:
@@ -51,6 +51,12 @@ class TestCustomer(TestSetup):
             email="test2@example.com",
             contact_no=PhoneNumber("+923011234567"),
             address="Test Address 2",
+        )
+        self.test_customer_3 = CustomerBase(
+            name="Test Customer 3",
+            email="test3@example.com",
+            contact_no=PhoneNumber("+923021234567"),
+            address="Test Address 3",
         )
 
     def test_create_customer(self) -> None:
@@ -230,13 +236,75 @@ class TestCustomer(TestSetup):
             record=Customer(**self.test_customer_2.model_dump()),
         )
 
-        result: Sequence[Customer] = self.customer_view.read_all(
+        result: PaginationBase[Customer] = self.customer_view.read_all(
             db_session=self.session
         )
 
-        assert len(result) == 2
-        assert any(c.email == "test1@example.com" for c in result)
-        assert any(c.email == "test2@example.com" for c in result)
+        assert result.current_page == 1
+        assert result.limit == 10
+        assert result.total_pages == 1
+        assert result.total_records == 2
+        assert result.next_record_id is None
+        assert result.previous_record_id is None
+
+        # Assert records content
+        assert len(result.records) == 2
+        assert any(
+            c.email == self.test_customer_1.email for c in result.records
+        )
+        assert any(
+            c.email == self.test_customer_2.email for c in result.records
+        )
+
+    def test_read_all_customers_pagination(self) -> None:
+        """Test case for customer pagination with multiple pages."""
+        # Create three test customers to test pagination
+        customer_1: Customer = self.customer_view.create(
+            db_session=self.session,
+            record=Customer(**self.test_customer_1.model_dump()),
+        )
+        customer_2: Customer = self.customer_view.create(
+            db_session=self.session,
+            record=Customer(**self.test_customer_2.model_dump()),
+        )
+        customer_3: Customer = self.customer_view.create(
+            db_session=self.session,
+            record=Customer(**self.test_customer_3.model_dump()),
+        )
+
+        # Test first page with limit of 2
+        page1_result: PaginationBase[Customer] = self.customer_view.read_all(
+            db_session=self.session, page=1, limit=2
+        )
+
+        # Assert first page
+        assert page1_result.current_page == 1
+        assert page1_result.limit == 2
+        assert page1_result.total_pages == 2
+        assert page1_result.total_records == 3
+        assert page1_result.next_record_id == customer_2.id + 1
+        assert page1_result.previous_record_id is None
+        assert len(page1_result.records) == 2
+        assert any(c.email == customer_1.email for c in page1_result.records)
+        assert any(c.email == customer_2.email for c in page1_result.records)
+        assert all(c.email != customer_3.email for c in page1_result.records)
+
+        # Test second page
+        page2_result: PaginationBase[Customer] = self.customer_view.read_all(
+            db_session=self.session, page=2, limit=2
+        )
+
+        # Assert second page
+        assert page2_result.current_page == 2
+        assert page2_result.limit == 2
+        assert page2_result.total_pages == 2
+        assert page2_result.total_records == 3
+        assert page2_result.next_record_id is None
+        assert page2_result.previous_record_id == 1
+        assert len(page2_result.records) == 1
+        assert any(c.email == customer_3.email for c in page2_result.records)
+        assert all(c.email != customer_1.email for c in page2_result.records)
+        assert all(c.email != customer_2.email for c in page2_result.records)
 
     def test_update_customer(self) -> None:
         """Test case for updating a customer."""
@@ -245,7 +313,7 @@ class TestCustomer(TestSetup):
             record=Customer(**self.test_customer_1.model_dump()),
         )
 
-        result: Customer | None = self.customer_view.update(
+        result: Customer | None = self.customer_view.update_by_id(
             db_session=self.session,
             record_id=customer.id,
             record=Customer(**self.test_customer_2.model_dump()),
@@ -258,7 +326,7 @@ class TestCustomer(TestSetup):
     def test_update_non_existent_customer(self) -> None:
         """Test case for updating a non-existent customer."""
         non_existent_id: int = -1
-        result: Customer | None = self.customer_view.update(
+        result: Customer | None = self.customer_view.update_by_id(
             db_session=self.session,
             record_id=non_existent_id,
             record=Customer(**self.test_customer_1.model_dump()),
@@ -289,7 +357,7 @@ class TestCustomer(TestSetup):
         )
 
         with pytest.raises(IntegrityError) as exc_info:
-            self.customer_view.update(
+            self.customer_view.update_by_id(
                 db_session=self.session,
                 record_id=customer.id,
                 record=Customer(**duplicate_email_customer.model_dump()),
@@ -321,7 +389,7 @@ class TestCustomer(TestSetup):
         )
 
         with pytest.raises(IntegrityError) as exc_info:
-            self.customer_view.update(
+            self.customer_view.update_by_id(
                 db_session=self.session,
                 record_id=customer.id,
                 record=Customer(**duplicate_contact_no_customer.model_dump()),
@@ -338,7 +406,7 @@ class TestCustomer(TestSetup):
             record=Customer(**self.test_customer_1.model_dump()),
         )
 
-        result: Customer | None = self.customer_view.delete(
+        result: Customer | None = self.customer_view.delete_by_id(
             db_session=self.session, record_id=customer.id
         )
 
@@ -355,7 +423,7 @@ class TestCustomer(TestSetup):
     def test_delete_non_existent_customer(self) -> None:
         """Test case for deleting a non-existent customer."""
         non_existent_id: int = -1
-        result: Customer | None = self.customer_view.delete(
+        result: Customer | None = self.customer_view.delete_by_id(
             db_session=self.session, record_id=non_existent_id
         )
 

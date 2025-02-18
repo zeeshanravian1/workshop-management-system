@@ -30,7 +30,7 @@ class InventoryBase(SQLModel):
 
     """
 
-    item_name: str = Field(max_length=255)
+    item_name: str = Field(max_length=255, unique=True, index=True)
     quantity: int = Field(gt=0)
     unit_price: float = Field(gt=0)
     minimum_threshold: int = Field(gt=0)

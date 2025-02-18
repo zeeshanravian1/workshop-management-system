@@ -5,14 +5,13 @@ Description:
 
 """
 
-from collections.abc import Sequence
-
 import pytest
 from pydantic import ValidationError
 from pydantic_extra_types.phone_numbers import PhoneNumber
 from sqlalchemy.exc import IntegrityError
 
 from tests.conftest import TestSetup
+from workshop_management_system.v1.base.model import PaginationBase
 from workshop_management_system.v1.supplier.model import Supplier, SupplierBase
 from workshop_management_system.v1.supplier.view import SupplierView
 
@@ -35,6 +34,7 @@ class TestSupplier(TestSetup):
     supplier_view: SupplierView
     test_supplier_1: SupplierBase
     test_supplier_2: SupplierBase
+    test_supplier_3: SupplierBase
 
     @pytest.fixture(autouse=True)
     def setup_method(self) -> None:
@@ -51,6 +51,12 @@ class TestSupplier(TestSetup):
             email="test2@example.com",
             contact_no=PhoneNumber("+923011234567"),
             address="Test Address 2",
+        )
+        self.test_supplier_3 = SupplierBase(
+            name="Test Supplier 3",
+            email="test3@example.com",
+            contact_no=PhoneNumber("+923021234567"),
+            address="Test Address 3",
         )
 
     def test_create_supplier(self) -> None:
@@ -230,13 +236,75 @@ class TestSupplier(TestSetup):
             record=Supplier(**self.test_supplier_2.model_dump()),
         )
 
-        result: Sequence[Supplier] = self.supplier_view.read_all(
+        result: PaginationBase[Supplier] = self.supplier_view.read_all(
             db_session=self.session
         )
 
-        assert len(result) == 2
-        assert any(c.email == "test1@example.com" for c in result)
-        assert any(c.email == "test2@example.com" for c in result)
+        assert result.current_page == 1
+        assert result.limit == 10
+        assert result.total_pages == 1
+        assert result.total_records == 2
+        assert result.next_record_id is None
+        assert result.previous_record_id is None
+
+        # Assert records content
+        assert len(result.records) == 2
+        assert any(
+            s.email == self.test_supplier_1.email for s in result.records
+        )
+        assert any(
+            s.email == self.test_supplier_2.email for s in result.records
+        )
+
+    def test_read_all_suppliers_pagination(self) -> None:
+        """Test case for supplier pagination with multiple pages."""
+        # Create three test suppliers to test pagination
+        supplier_1: Supplier = self.supplier_view.create(
+            db_session=self.session,
+            record=Supplier(**self.test_supplier_1.model_dump()),
+        )
+        supplier_2: Supplier = self.supplier_view.create(
+            db_session=self.session,
+            record=Supplier(**self.test_supplier_2.model_dump()),
+        )
+        supplier_3: Supplier = self.supplier_view.create(
+            db_session=self.session,
+            record=Supplier(**self.test_supplier_3.model_dump()),
+        )
+
+        # Test first page with limit of 2
+        page1_result: PaginationBase[Supplier] = self.supplier_view.read_all(
+            db_session=self.session, page=1, limit=2
+        )
+
+        # Assert first page
+        assert page1_result.current_page == 1
+        assert page1_result.limit == 2
+        assert page1_result.total_pages == 2
+        assert page1_result.total_records == 3
+        assert page1_result.next_record_id == supplier_2.id + 1
+        assert page1_result.previous_record_id is None
+        assert len(page1_result.records) == 2
+        assert any(s.email == supplier_1.email for s in page1_result.records)
+        assert any(s.email == supplier_2.email for s in page1_result.records)
+        assert all(s.email != supplier_3.email for s in page1_result.records)
+
+        # Test second page
+        page2_result: PaginationBase[Supplier] = self.supplier_view.read_all(
+            db_session=self.session, page=2, limit=2
+        )
+
+        # Assert second page
+        assert page2_result.current_page == 2
+        assert page2_result.limit == 2
+        assert page2_result.total_pages == 2
+        assert page2_result.total_records == 3
+        assert page2_result.next_record_id is None
+        assert page2_result.previous_record_id == 1
+        assert len(page2_result.records) == 1
+        assert any(s.email == supplier_3.email for s in page2_result.records)
+        assert all(s.email != supplier_1.email for s in page2_result.records)
+        assert all(s.email != supplier_2.email for s in page2_result.records)
 
     def test_update_supplier(self) -> None:
         """Test case for updating a supplier."""
@@ -245,7 +313,7 @@ class TestSupplier(TestSetup):
             record=Supplier(**self.test_supplier_1.model_dump()),
         )
 
-        result: Supplier | None = self.supplier_view.update(
+        result: Supplier | None = self.supplier_view.update_by_id(
             db_session=self.session,
             record_id=supplier.id,
             record=Supplier(**self.test_supplier_2.model_dump()),
@@ -258,7 +326,7 @@ class TestSupplier(TestSetup):
     def test_update_non_existent_supplier(self) -> None:
         """Test case for updating a non-existent supplier."""
         non_existent_id: int = -1
-        result: Supplier | None = self.supplier_view.update(
+        result: Supplier | None = self.supplier_view.update_by_id(
             db_session=self.session,
             record_id=non_existent_id,
             record=Supplier(**self.test_supplier_1.model_dump()),
@@ -289,7 +357,7 @@ class TestSupplier(TestSetup):
         )
 
         with pytest.raises(IntegrityError) as exc_info:
-            self.supplier_view.update(
+            self.supplier_view.update_by_id(
                 db_session=self.session,
                 record_id=supplier.id,
                 record=Supplier(**duplicate_email_supplier.model_dump()),
@@ -321,7 +389,7 @@ class TestSupplier(TestSetup):
         )
 
         with pytest.raises(IntegrityError) as exc_info:
-            self.supplier_view.update(
+            self.supplier_view.update_by_id(
                 db_session=self.session,
                 record_id=supplier.id,
                 record=Supplier(**duplicate_contact_no_supplier.model_dump()),
@@ -338,7 +406,7 @@ class TestSupplier(TestSetup):
             record=Supplier(**self.test_supplier_1.model_dump()),
         )
 
-        result: Supplier | None = self.supplier_view.delete(
+        result: Supplier | None = self.supplier_view.delete_by_id(
             db_session=self.session, record_id=supplier.id
         )
 
@@ -355,7 +423,7 @@ class TestSupplier(TestSetup):
     def test_delete_non_existent_supplier(self) -> None:
         """Test case for deleting a non-existent supplier."""
         non_existent_id: int = -1
-        result: Supplier | None = self.supplier_view.delete(
+        result: Supplier | None = self.supplier_view.delete_by_id(
             db_session=self.session, record_id=non_existent_id
         )
 

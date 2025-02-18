@@ -110,7 +110,7 @@ repos:
   # Checks Python code for adherence to PEP 8 style guidelines, potential
   # programming errors, and code complexity, helping maintain code quality.
   - repo: https://github.com/pycqa/flake8
-    rev: 7.1.1
+    rev: 7.1.2
     hooks:
     - id: flake8
       exclude: .git,__pycache__
@@ -139,7 +139,7 @@ repos:
   # A tool for finding common security issues in Python code, helping ensure
   # secure code practices and prevent security vulnerabilities.
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.2
+    rev: 1.8.3
     hooks:
     - id: bandit
       name: bandit
