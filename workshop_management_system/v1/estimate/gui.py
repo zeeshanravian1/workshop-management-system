@@ -1030,12 +1030,16 @@ class EstimateGUI(QWidget):
                 if not estimate:
                     raise ValueError("Estimate not found")
 
-                # Get inventory items
-                inventory_items = session.exec(
-                    select(InventoryEstimate).where(
-                        InventoryEstimate.estimate_id == estimate_id
+                # Get inventory items with joined Inventory table
+                stmt = (
+                    select(InventoryEstimate, Inventory)
+                    .join(
+                        Inventory,
+                        InventoryEstimate.inventory_id == Inventory.id,
                     )
-                ).all()
+                    .where(InventoryEstimate.estimate_id == estimate_id)
+                )
+                inventory_items = session.exec(stmt).all()
 
                 # Generate PDF
                 filename = f"estimate_{estimate_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
@@ -1100,14 +1104,20 @@ class EstimateGUI(QWidget):
             items_data = [["Item", "Quantity", "Unit Price", "Total"]]
             subtotal = 0
 
-            for item in inventory_items:
-                item_total = item.quantity_used * item.unit_price_at_time
+            for (
+                inv_estimate,
+                inventory,
+            ) in inventory_items:  # Modified this line
+                item_total = (
+                    inv_estimate.quantity_used
+                    * inv_estimate.unit_price_at_time
+                )
                 subtotal += item_total
                 items_data.append(
                     [
-                        str(item.inventory.item_name),
-                        str(item.quantity_used),
-                        f"${item.unit_price_at_time:.2f}",
+                        str(inventory.item_name),  # Use inventory directly
+                        str(inv_estimate.quantity_used),
+                        f"${inv_estimate.unit_price_at_time:.2f}",
                         f"${item_total:.2f}",
                     ]
                 )
