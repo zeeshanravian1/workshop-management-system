@@ -10,14 +10,14 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QFrame,
     QHBoxLayout,
-    QHeaderView,
+    QHeaderView,  # Add this import
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QSizePolicy,  # Add this import
+    QSizePolicy,
     QTableWidget,
-    QTableWidgetItem,
+    QTableWidgetItem,  # Add this import
     QVBoxLayout,
     QWidget,
 )
@@ -202,12 +202,21 @@ class VehicleGUI(QWidget):
         """Initialize the Vehicle GUI."""
         super().__init__(parent)
         self.parent_widget = parent
-        # Add pagination properties
-        self.page_size = 15
-        self.current_page = 1
-        self.total_records = 0
-        self.all_vehicles = []  # Store all vehicles
-        self.filtered_vehicles = []  # Store filtered results
+        # Update pagination to match PaginationBase
+        self.pagination = {
+            "current_page": 1,
+            "limit": 15,
+            "total_pages": 0,
+            "total_records": 0,
+            "next_record_id": None,
+            "previous_record_id": None,
+            "records": [],
+        }
+        # Keep original properties for compatibility
+        self.page_size = self.pagination["limit"]
+        self.current_page = self.pagination["current_page"]
+        self.all_vehicles = []
+        self.filtered_vehicles = []
 
         # Update theme to match CustomerGUI
         self.setStyleSheet("""
@@ -437,55 +446,83 @@ class VehicleGUI(QWidget):
 
     def update_pagination_buttons(self, total_pages: int) -> None:
         """Update the pagination buttons."""
+        # Clear existing buttons
         while self.page_buttons_layout.count():
             item = self.page_buttons_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        max_visible_pages = 7
-        if total_pages <= max_visible_pages:
-            for page in range(1, total_pages + 1):
-                self.add_page_button(page)
+        current_page = self.pagination["current_page"]
+
+        # Always show first page
+        self.add_page_button(1)
+
+        if total_pages > 7:
+            # Show ellipsis after first page if needed
+            if current_page > 3:
+                self.page_buttons_layout.addWidget(self._create_ellipsis())
+
+            # Show pages around current page
+            if current_page <= 3:
+                # Near start - show first few pages
+                for page in range(2, 6):
+                    self.add_page_button(page)
+            elif current_page >= total_pages - 2:
+                # Near end - show last few pages
+                for page in range(total_pages - 4, total_pages):
+                    self.add_page_button(page)
+            else:
+                # In middle - show pages around current
+                for page in range(current_page - 2, current_page + 3):
+                    if 1 < page < total_pages:
+                        self.add_page_button(page)
+
+            # Show ellipsis before last page if needed
+            if current_page < total_pages - 3:
+                self.page_buttons_layout.addWidget(self._create_ellipsis())
+
         else:
-            # Show first pages
-            for page in range(1, 4):
+            # For small number of pages, show all pages
+            for page in range(2, total_pages + 1):
                 self.add_page_button(page)
 
-            # Add ellipsis
-            if self.current_page > 4:
-                ellipsis = QPushButton("...")
-                ellipsis.setEnabled(False)
-                ellipsis.setStyleSheet("background: none; border: none;")
-                self.page_buttons_layout.addWidget(ellipsis)
+        # Always show last page if more than one page
+        if total_pages > 1:
+            self.add_page_button(total_pages)
 
-            # Show current and surrounding pages
-            if 4 < self.current_page < total_pages - 3:
-                self.add_page_button(self.current_page)
-
-            # Add ending ellipsis
-            if self.current_page < total_pages - 3:
-                ellipsis = QPushButton("...")
-                ellipsis.setEnabled(False)
-                ellipsis.setStyleSheet("background: none; border: none;")
-                self.page_buttons_layout.addWidget(ellipsis)
-
-            # Show last pages
-            for page in range(total_pages - 2, total_pages + 1):
-                self.add_page_button(page)
+    def _create_ellipsis(self):
+        """Create ellipsis button for pagination."""
+        ellipsis = QPushButton("...")
+        ellipsis.setEnabled(False)
+        ellipsis.setFixedSize(40, 40)
+        ellipsis.setStyleSheet("""
+            QPushButton {
+                background: none;
+                border: none;
+                color: #666;
+                font-weight: bold;
+                min-width: 40px;
+            }
+        """)
+        return ellipsis
 
     def add_page_button(self, page_num: int) -> None:
         """Add a single page button."""
         button = QPushButton(str(page_num))
         button.setFixedSize(40, 40)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.setMinimumWidth(40)
+        button.setMaximumWidth(40)
 
-        if page_num == self.current_page:
+        if page_num == self.pagination["current_page"]:
             button.setStyleSheet("""
                 QPushButton {
                     background-color: skyblue;
                     color: white;
                     border-radius: 20px;
                     font-weight: bold;
+                    min-width: 40px;
+                    max-width: 40px;
                 }
             """)
         else:
@@ -495,6 +532,8 @@ class VehicleGUI(QWidget):
                     color: black;
                     border: 1px solid #ddd;
                     border-radius: 20px;
+                    min-width: 40px;
+                    max-width: 40px;
                 }
                 QPushButton:hover {
                     background-color: #f0f0f0;
@@ -509,120 +548,60 @@ class VehicleGUI(QWidget):
         try:
             with Session(engine) as session:
                 if refresh_all:
-                    # Only fetch all vehicles if refresh_all is True
                     self.all_vehicles = self.vehicle_view.read_all(
                         db_session=session
                     )
                     self.filtered_vehicles = self.all_vehicles.copy()
-                    self.total_records = len(self.all_vehicles)
 
+                total_records = len(self.filtered_vehicles)
                 total_pages = (
-                    self.total_records + self.page_size - 1
-                ) // self.page_size
+                    total_records + self.pagination["limit"] - 1
+                ) // self.pagination["limit"]
 
-                # Calculate offset for current page
-                offset = (self.current_page - 1) * self.page_size
-                current_page_vehicles = self.filtered_vehicles[
-                    offset : offset + self.page_size
+                # Update pagination state
+                self.pagination.update(
+                    {
+                        "total_records": total_records,
+                        "total_pages": total_pages,
+                    }
+                )
+
+                # Calculate page data
+                start_idx = (
+                    self.pagination["current_page"] - 1
+                ) * self.pagination["limit"]
+                end_idx = start_idx + self.pagination["limit"]
+                current_page_records = self.filtered_vehicles[
+                    start_idx:end_idx
                 ]
+                self.pagination["records"] = current_page_records
 
-                # Update table
-                self.vehicle_table.setRowCount(len(current_page_vehicles) + 1)
-                self.vehicle_table.setColumnCount(8)
+                # Update next/previous record IDs
+                if end_idx < total_records:
+                    self.pagination["next_record_id"] = self.filtered_vehicles[
+                        end_idx
+                    ].id
+                else:
+                    self.pagination["next_record_id"] = None
 
-                # Set column names in the first row
-                column_names = [
-                    "ID",
-                    "Make",
-                    "Model",
-                    "Year",
-                    "Vehicle Number",
-                    "Chassis Number",
-                    "Engine Number",
-                    "Customer Name",
-                ]
-                for col, name in enumerate(column_names):
-                    item = QTableWidgetItem(name)
-                    item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-                    font = item.font()
-                    font.setBold(True)
-                    item.setFont(font)
-                    self.vehicle_table.setItem(0, col, item)
-
-                # Set the height of the first row
-                self.vehicle_table.setRowHeight(0, 40)
-
-                for row, vehicle in enumerate(current_page_vehicles, start=1):
-                    customer = session.exec(
-                        select(Customer).where(
-                            Customer.id == vehicle.customer_id
-                        )
-                    ).first()
-                    self.vehicle_table.setItem(
-                        row, 0, QTableWidgetItem(str(vehicle.id))
+                if start_idx > 0:
+                    self.pagination["previous_record_id"] = (
+                        self.filtered_vehicles[start_idx - 1].id
                     )
-                    self.vehicle_table.setItem(
-                        row, 1, QTableWidgetItem(vehicle.make)
-                    )
-                    self.vehicle_table.setItem(
-                        row, 2, QTableWidgetItem(vehicle.model)
-                    )
-                    self.vehicle_table.setItem(
-                        row, 3, QTableWidgetItem(str(vehicle.year))
-                    )
-                    self.vehicle_table.setItem(
-                        row, 4, QTableWidgetItem(vehicle.vehicle_number)
-                    )
-                    self.vehicle_table.setItem(
-                        row, 5, QTableWidgetItem(vehicle.chassis_number)
-                    )
-                    self.vehicle_table.setItem(
-                        row, 6, QTableWidgetItem(vehicle.engine_number)
-                    )
-                    self.vehicle_table.setItem(
-                        row,
-                        7,
-                        QTableWidgetItem(customer.name if customer else ""),
-                    )
+                else:
+                    self.pagination["previous_record_id"] = None
 
-                # Adjust column widths
-                self.vehicle_table.resizeColumnsToContents()
-                self.vehicle_table.horizontalHeader().setStretchLastSection(
-                    True
-                )
-                self.vehicle_table.horizontalHeader().setSectionResizeMode(
-                    QHeaderView.ResizeMode.Stretch
-                )
+                # Update table content
+                self._update_table_data(current_page_records)
 
-                # Set fixed row height
-                row_height = 40
-                for row in range(self.vehicle_table.rowCount()):
-                    self.vehicle_table.setRowHeight(row, row_height)
-
-                # Calculate visible rows
-                visible_rows = min(
-                    len(current_page_vehicles) + 1, self.page_size + 1
-                )
-
-                # Set table height to accommodate visible rows
-                table_height = (row_height * visible_rows) + 20  # Add padding
-                self.vehicle_table.setMinimumHeight(0)
-                self.vehicle_table.setMaximumHeight(
-                    16777215
-                )  # Qt's maximum value
-
-                # Update scrolling behavior
-                self.vehicle_table.setVerticalScrollBarPolicy(
-                    Qt.ScrollBarPolicy.ScrollBarAsNeeded
-                )
-                self.vehicle_table.setHorizontalScrollBarPolicy(
-                    Qt.ScrollBarPolicy.ScrollBarAsNeeded
-                )
-
-                # Update pagination
+                # Update pagination buttons
                 self.update_pagination_buttons(total_pages)
-                self.prev_button.setEnabled(self.current_page > 1)
-                self.next_button.setEnabled(self.current_page < total_pages)
+                self.prev_button.setEnabled(
+                    self.pagination["previous_record_id"] is not None
+                )
+                self.next_button.setEnabled(
+                    self.pagination["next_record_id"] is not None
+                )
 
         except Exception as e:
             QMessageBox.critical(
@@ -631,24 +610,27 @@ class VehicleGUI(QWidget):
 
     def next_page(self) -> None:
         """Load the next page of vehicles."""
-        total_pages = (
-            self.total_records + self.page_size - 1
-        ) // self.page_size
-        if self.current_page < total_pages:
-            self.current_page += 1
-            self.load_vehicles()
+        if self.pagination["next_record_id"] is not None:
+            self.pagination["current_page"] += 1
+            self.current_page = self.pagination["current_page"]  # Keep in sync
+            self.load_vehicles(refresh_all=False)
 
     def previous_page(self) -> None:
         """Load the previous page of vehicles."""
-        if self.current_page > 1:
-            self.current_page -= 1
-            self.load_vehicles()
+        if self.pagination["previous_record_id"] is not None:
+            self.pagination["current_page"] -= 1
+            self.current_page = self.pagination["current_page"]  # Keep in sync
+            self.load_vehicles(refresh_all=False)
 
     def go_to_page(self, page_number: int) -> None:
         """Navigate to specific page number."""
-        if page_number != self.current_page:
-            self.current_page = page_number
-            self.load_vehicles()
+        if (
+            1 <= page_number <= self.pagination["total_pages"]
+            and page_number != self.pagination["current_page"]
+        ):
+            self.pagination["current_page"] = page_number
+            self.current_page = page_number  # Keep in sync
+            self.load_vehicles(refresh_all=False)
 
     def create_input_dialog(
         self, title: str, vehicle: Vehicle | None = None
@@ -962,7 +944,7 @@ class VehicleGUI(QWidget):
             self.parent_widget.setCurrentIndex(0)
 
     def search_vehicles(self) -> None:
-        """Filter vehicles based on search criteria across all data."""
+        """Filter vehicles based on search criteria."""
         search_text = self.search_input.text().lower()
         criteria = self.search_criteria.currentText().lower()
 
@@ -996,8 +978,9 @@ class VehicleGUI(QWidget):
             ]
 
         # Reset pagination and reload
-        self.current_page = 1
-        self.total_records = len(self.filtered_vehicles)
+        self.pagination["current_page"] = 1
+        self.current_page = 1  # Keep in sync
+        self.pagination["total_records"] = len(self.filtered_vehicles)
         self.load_vehicles(refresh_all=False)
 
     def get_customer_name(self, vehicle) -> str:
@@ -1010,6 +993,69 @@ class VehicleGUI(QWidget):
                 return customer.name if customer else ""
         except Exception:
             return ""
+
+    def _update_table_data(self, records):
+        """Update table data while preserving table properties."""
+        self.vehicle_table.setRowCount(len(records) + 1)  # +1 for header
+        self.vehicle_table.setColumnCount(8)
+
+        # Set headers
+        headers = [
+            "ID",
+            "Make",
+            "Model",
+            "Year",
+            "Vehicle Number",
+            "Chassis Number",
+            "Engine Number",
+            "Customer Name",
+        ]
+        for col, header in enumerate(headers):
+            item = QTableWidgetItem(header)
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            self.vehicle_table.setItem(0, col, item)
+
+        # Populate data
+        for row, vehicle in enumerate(records, start=1):
+            with Session(engine) as session:
+                customer = session.exec(
+                    select(Customer).where(Customer.id == vehicle.customer_id)
+                ).first()
+                customer_name = customer.name if customer else ""
+
+            self.vehicle_table.setItem(
+                row, 0, QTableWidgetItem(str(vehicle.id))
+            )
+            self.vehicle_table.setItem(row, 1, QTableWidgetItem(vehicle.make))
+            self.vehicle_table.setItem(row, 2, QTableWidgetItem(vehicle.model))
+            self.vehicle_table.setItem(
+                row, 3, QTableWidgetItem(str(vehicle.year))
+            )
+            self.vehicle_table.setItem(
+                row, 4, QTableWidgetItem(vehicle.vehicle_number)
+            )
+            self.vehicle_table.setItem(
+                row, 5, QTableWidgetItem(vehicle.chassis_number)
+            )
+            self.vehicle_table.setItem(
+                row, 6, QTableWidgetItem(vehicle.engine_number)
+            )
+            self.vehicle_table.setItem(row, 7, QTableWidgetItem(customer_name))
+
+        # Maintain table appearance
+        self.vehicle_table.resizeColumnsToContents()
+        self.vehicle_table.horizontalHeader().setStretchLastSection(True)
+        self.vehicle_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+
+        # Set consistent row heights
+        row_height = 40
+        for row in range(self.vehicle_table.rowCount()):
+            self.vehicle_table.setRowHeight(row, row_height)
 
 
 if __name__ == "__main__":  # Fixed syntax error here - added == operator
