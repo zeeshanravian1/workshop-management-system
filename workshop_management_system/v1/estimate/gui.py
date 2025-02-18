@@ -5,6 +5,7 @@ Description:
 
 """
 
+import webbrowser
 from datetime import datetime
 
 from PyQt6.QtCore import Qt
@@ -28,6 +29,10 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle
 from sqlmodel import Session, select
 
 from workshop_management_system.database.connection import engine
@@ -251,8 +256,13 @@ class InventoryItemsDialog(QDialog):
 class EstimateDialog(QDialog):
     """Dialog for adding/updating an estimate."""
 
-    def __init__(self, parent=None) -> None:
-        """Initialize the Estimate Dialog."""
+    def __init__(self, parent=None, estimate_data=None) -> None:
+        """Initialize the Estimate Dialog.
+
+        Args:
+            parent: Parent widget
+            estimate_data: Dictionary containing estimate data for update mode
+        """
         super().__init__(parent)
         self.setWindowTitle("Estimate Details")
         self.setMinimumWidth(400)
@@ -322,6 +332,24 @@ class EstimateDialog(QDialog):
 
         self.original_quantities = {}  # Store original quantities for updates
         self.selected_items = []
+
+        # Pre-populate fields if estimate_data is provided
+        if estimate_data:
+            self.total_amount_input.setText(str(estimate_data["total_amount"]))
+            self.status_input.setText(estimate_data["status"])
+            self.description_input.setText(estimate_data["description"] or "")
+            self.valid_until_input.setText(estimate_data["valid_until"])
+            self.vehicle_id_input.setText(str(estimate_data["vehicle_id"]))
+            self.job_card_id_input.setText(
+                str(estimate_data["job_card_id"])
+                if estimate_data["job_card_id"]
+                else ""
+            )
+            self.customer_id_input.setText(str(estimate_data["customer_id"]))
+
+            # Pre-populate inventory items
+            self.selected_items = estimate_data.get("inventory_items", [])
+            self.update_inventory_items_table()
 
     def select_inventory_items(self):
         """Open dialog to select inventory items."""
@@ -557,6 +585,7 @@ class EstimateGUI(QWidget):
             ("Add Estimate", self.add_estimate),
             ("Update Estimate", self.update_estimate),
             ("Delete Estimate", self.delete_estimate),
+            ("Generate PDF", self.generate_pdf),  # Add the PDF button
         ]
 
         for text, handler in buttons:
@@ -756,103 +785,155 @@ class EstimateGUI(QWidget):
             return
         estimate_id = item.text()
 
-        dialog = EstimateDialog(self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            data = dialog.get_data()
-            try:
-                with Session(engine) as session:
-                    vehicle = session.exec(
-                        select(Vehicle).where(
-                            Vehicle.id == int(data["vehicle_id"])
-                        )
-                    ).first()
-                    if not vehicle:
-                        raise ValueError("Vehicle not found")
+        try:
+            with Session(engine) as session:
+                # Get the existing estimate data
+                estimate = self.estimate_view.read_by_id(
+                    db_session=session, record_id=int(estimate_id)
+                )
 
-                    estimate_obj = self.estimate_view.read_by_id(
-                        db_session=session, record_id=int(estimate_id)
+                if not estimate:
+                    raise ValueError("Estimate not found")
+
+                # Get related inventory items
+                inventory_items = session.exec(
+                    select(InventoryEstimate).where(
+                        InventoryEstimate.estimate_id == int(estimate_id)
                     )
-                    if estimate_obj:
-                        # Get quantity changes
-                        changes = dialog.get_quantity_changes()
+                ).all()
 
-                        # Update inventory quantities
-                        total_amount = 0
-                        for item in data["inventory_items"]:
-                            inventory = session.exec(
-                                select(Inventory).where(
-                                    Inventory.item_name == item["item_name"]
+                # Prepare data for the dialog
+                estimate_data = {
+                    "total_amount": estimate.total_estimate_amount,
+                    "status": estimate.status,
+                    "description": estimate.description,
+                    "valid_until": estimate.valid_until.strftime("%Y-%m-%d"),
+                    "vehicle_id": estimate.vehicle_id,
+                    "job_card_id": estimate.job_card_id,
+                    "customer_id": estimate.customer_id,
+                    "inventory_items": [
+                        {
+                            "item_name": item.inventory.item_name,
+                            "quantity": item.quantity_used,
+                            "unit_price": item.unit_price_at_time,
+                        }
+                        for item in inventory_items
+                    ],
+                }
+
+                # Create dialog with pre-populated data
+                dialog = EstimateDialog(self, estimate_data)
+
+                if dialog.exec() == QDialog.DialogCode.Accepted:
+                    # Rest of your existing update logic
+                    data = dialog.get_data()
+                    try:
+                        with Session(engine) as session:
+                            vehicle = session.exec(
+                                select(Vehicle).where(
+                                    Vehicle.id == int(data["vehicle_id"])
                                 )
                             ).first()
+                            if not vehicle:
+                                raise ValueError("Vehicle not found")
 
-                            if inventory:
-                                # Update inventory quantity based on changes
-                                if item["item_name"] in changes:
-                                    inventory.quantity -= changes[
-                                        item["item_name"]
-                                    ]
+                            estimate_obj = self.estimate_view.read_by_id(
+                                db_session=session, record_id=int(estimate_id)
+                            )
+                            if estimate_obj:
+                                # Get quantity changes
+                                changes = dialog.get_quantity_changes()
 
-                                # Update or create association
-                                association = session.exec(
-                                    select(InventoryEstimate).where(
-                                        InventoryEstimate.inventory_id
-                                        == inventory.id,
-                                        InventoryEstimate.estimate_id
-                                        == estimate_obj.id,
-                                    )
-                                ).first()
+                                # Update inventory quantities
+                                total_amount = 0
+                                for item in data["inventory_items"]:
+                                    inventory = session.exec(
+                                        select(Inventory).where(
+                                            Inventory.item_name
+                                            == item["item_name"]
+                                        )
+                                    ).first()
 
-                                if association:
-                                    association.quantity_used = item[
-                                        "quantity"
-                                    ]
-                                    association.unit_price_at_time = item[
-                                        "unit_price"
-                                    ]
-                                else:
-                                    association = InventoryEstimate(
-                                        inventory_id=inventory.id,
-                                        estimate_id=estimate_obj.id,
-                                        quantity_used=item["quantity"],
-                                        unit_price_at_time=item["unit_price"],
-                                    )
-                                    session.add(association)
+                                    if inventory:
+                                        # Update inventory quantity based on changes
+                                        if item["item_name"] in changes:
+                                            inventory.quantity -= changes[
+                                                item["item_name"]
+                                            ]
 
-                                total_amount += (
-                                    item["quantity"] * item["unit_price"]
+                                        # Update or create association
+                                        association = session.exec(
+                                            select(InventoryEstimate).where(
+                                                InventoryEstimate.inventory_id
+                                                == inventory.id,
+                                                InventoryEstimate.estimate_id
+                                                == estimate_obj.id,
+                                            )
+                                        ).first()
+
+                                        if association:
+                                            association.quantity_used = item[
+                                                "quantity"
+                                            ]
+                                            association.unit_price_at_time = (
+                                                item["unit_price"]
+                                            )
+                                        else:
+                                            association = InventoryEstimate(
+                                                inventory_id=inventory.id,
+                                                estimate_id=estimate_obj.id,
+                                                quantity_used=item["quantity"],
+                                                unit_price_at_time=item[
+                                                    "unit_price"
+                                                ],
+                                            )
+                                            session.add(association)
+
+                                        total_amount += (
+                                            item["quantity"]
+                                            * item["unit_price"]
+                                        )
+
+                                # Update estimate
+                                estimate_obj.total_estimate_amount = (
+                                    total_amount
                                 )
+                                estimate_obj.estimate_date = datetime.now()
+                                estimate_obj.total_estimate_amount = data[
+                                    "total_amount"
+                                ]
+                                estimate_obj.status = data["status"]
+                                estimate_obj.description = data["description"]
+                                estimate_obj.valid_until = datetime.strptime(
+                                    data["valid_until"], "%Y-%m-%d"
+                                )
+                                estimate_obj.customer_id = vehicle.customer_id
+                                estimate_obj.vehicle_id = vehicle.id
+                                estimate_obj.job_card_id = (
+                                    int(data["job_card_id"])
+                                    if data["job_card_id"]
+                                    else None
+                                )
+                                self.estimate_view.update(
+                                    db_session=session,
+                                    record_id=int(estimate_id),
+                                    record=estimate_obj,
+                                )
+                                QMessageBox.information(
+                                    self,
+                                    "Success",
+                                    "Estimate updated successfully!",
+                                )
+                                self.load_estimates()
+                    except Exception as e:
+                        QMessageBox.critical(
+                            self, "Error", f"Failed to update estimate: {e!s}"
+                        )
 
-                        # Update estimate
-                        estimate_obj.total_estimate_amount = total_amount
-                        estimate_obj.estimate_date = datetime.now()
-                        estimate_obj.total_estimate_amount = data[
-                            "total_amount"
-                        ]
-                        estimate_obj.status = data["status"]
-                        estimate_obj.description = data["description"]
-                        estimate_obj.valid_until = datetime.strptime(
-                            data["valid_until"], "%Y-%m-%d"
-                        )
-                        estimate_obj.customer_id = vehicle.customer_id
-                        estimate_obj.vehicle_id = vehicle.id
-                        estimate_obj.job_card_id = (
-                            int(data["job_card_id"])
-                            if data["job_card_id"]
-                            else None
-                        )
-                        self.estimate_view.update(
-                            db_session=session,
-                            record_id=int(estimate_id),
-                            record=estimate_obj,
-                        )
-                        QMessageBox.information(
-                            self, "Success", "Estimate updated successfully!"
-                        )
-                        self.load_estimates()
-            except Exception as e:
-                QMessageBox.critical(
-                    self, "Error", f"Failed to update estimate: {e!s}"
-                )
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Error", f"Failed to update estimate: {e!s}"
+            )
 
     def delete_estimate(self) -> None:
         """Delete an estimate from the database."""
@@ -920,6 +1001,177 @@ class EstimateGUI(QWidget):
                     show_row = False
 
             self.estimate_table.setRowHidden(row, not show_row)
+
+    def generate_pdf(self) -> None:
+        """Generate PDF for the selected estimate."""
+        selected_row = self.estimate_table.currentRow()
+        if selected_row == -1:
+            QMessageBox.warning(
+                self, "Warning", "Please select an estimate to generate PDF."
+            )
+            return
+
+        item = self.estimate_table.item(selected_row, 0)
+        if item is None:
+            QMessageBox.warning(
+                self, "Warning", "Selected estimate ID is invalid."
+            )
+            return
+
+        estimate_id = int(item.text())
+
+        try:
+            with Session(engine) as session:
+                # Get estimate with related inventory items
+                estimate = self.estimate_view.read_by_id(
+                    db_session=session, record_id=estimate_id
+                )
+
+                if not estimate:
+                    raise ValueError("Estimate not found")
+
+                # Get inventory items
+                inventory_items = session.exec(
+                    select(InventoryEstimate).where(
+                        InventoryEstimate.estimate_id == estimate_id
+                    )
+                ).all()
+
+                # Generate PDF
+                filename = f"estimate_{estimate_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                self.generate_estimate_pdf(estimate, inventory_items, filename)
+
+                # Open the generated PDF
+                webbrowser.open_new_tab(filename)
+
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"PDF generated successfully!\nSaved as: {filename}",
+                )
+
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Error", f"Failed to generate PDF: {e!s}"
+            )
+
+    def generate_estimate_pdf(self, estimate, inventory_items, filename):
+        """Generate detailed PDF for an estimate."""
+        doc = SimpleDocTemplate(filename, pagesize=letter)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Header
+        elements.append(Paragraph(f"Estimate #{estimate.id}", styles["Title"]))
+        elements.append(
+            Paragraph(
+                f"Date: {estimate.estimate_date.strftime('%Y-%m-%d')}",
+                styles["Normal"],
+            )
+        )
+        elements.append(Paragraph("<br/><br/>", styles["Normal"]))
+
+        # Basic Estimate Details
+        estimate_data = [
+            ["Vehicle ID:", str(estimate.vehicle_id)],
+            ["Status:", estimate.status],
+            ["Description:", estimate.description or "N/A"],
+            ["Valid Until:", estimate.valid_until.strftime("%Y-%m-%d")],
+        ]
+
+        basic_table = Table(estimate_data, colWidths=[100, 400])
+        basic_table.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                    ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                    ("BACKGROUND", (0, 0), (0, -1), colors.lightgrey),
+                    ("PADDING", (0, 0), (-1, -1), 6),
+                ]
+            )
+        )
+        elements.append(basic_table)
+        elements.append(Paragraph("<br/><br/>", styles["Normal"]))
+
+        # Inventory Items Table
+        if inventory_items:
+            elements.append(Paragraph("Inventory Items", styles["Heading2"]))
+            items_data = [["Item", "Quantity", "Unit Price", "Total"]]
+            subtotal = 0
+
+            for item in inventory_items:
+                item_total = item.quantity_used * item.unit_price_at_time
+                subtotal += item_total
+                items_data.append(
+                    [
+                        str(item.inventory.item_name),
+                        str(item.quantity_used),
+                        f"${item.unit_price_at_time:.2f}",
+                        f"${item_total:.2f}",
+                    ]
+                )
+
+            # Calculate GST and total
+            gst = subtotal * 0.18  # 18% GST
+            grand_total = subtotal + gst
+
+            # Add totals to the table
+            items_data.extend(
+                [
+                    ["", "", "Subtotal:", f"${subtotal:.2f}"],
+                    ["", "", "GST (18%):", f"${gst:.2f}"],
+                    ["", "", "Grand Total:", f"${grand_total:.2f}"],
+                ]
+            )
+
+            items_table = Table(items_data, colWidths=[200, 100, 100, 100])
+            items_table.setStyle(
+                TableStyle(
+                    [
+                        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                        (
+                            "ALIGN",
+                            (-1, 0),
+                            (-1, -1),
+                            "RIGHT",
+                        ),  # Right align amounts
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                        (
+                            "BACKGROUND",
+                            (0, -3),
+                            (-1, -1),
+                            colors.lightgrey,
+                        ),  # Highlight totals
+                        ("PADDING", (0, 0), (-1, -1), 6),
+                    ]
+                )
+            )
+            elements.append(items_table)
+        else:
+            elements.append(
+                Paragraph("No inventory items found.", styles["Normal"])
+            )
+
+        # Footer
+        elements.append(Paragraph("<br/><br/>", styles["Normal"]))
+        elements.append(Paragraph("Terms and Conditions:", styles["Heading2"]))
+        elements.append(
+            Paragraph("1. All prices are in USD", styles["Normal"])
+        )
+        elements.append(
+            Paragraph("2. Estimate valid for 30 days", styles["Normal"])
+        )
+        elements.append(
+            Paragraph(
+                "3. Final price may vary based on additional services",
+                styles["Normal"],
+            )
+        )
+
+        doc.build(elements)
 
 
 if __name__ == "__main__":
