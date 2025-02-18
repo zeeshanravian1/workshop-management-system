@@ -135,12 +135,21 @@ class CustomerGUI(QWidget):
         """Initialize the Customer GUI."""
         super().__init__(parent)
         self.parent_widget = parent
-        # Add pagination properties
-        self.page_size = 15  # Increased from 10 to 15
-        self.current_page = 1
-        self.total_records = 0
-        self.all_customers = []  # Add this to store all customers
-        self.filtered_customers = []  # Add this to store filtered results
+        # Update pagination to match PaginationBase
+        self.pagination = {
+            "current_page": 1,
+            "limit": 15,  # Keep original page size
+            "total_pages": 0,
+            "total_records": 0,
+            "next_record_id": None,
+            "previous_record_id": None,
+            "records": [],
+        }
+        # Keep original properties for compatibility
+        self.page_size = self.pagination["limit"]
+        self.current_page = self.pagination["current_page"]
+        self.all_customers = []
+        self.filtered_customers = []
 
         self.setStyleSheet("""
             QWidget {
@@ -399,8 +408,9 @@ class CustomerGUI(QWidget):
             ]
 
         # Reset pagination
-        self.current_page = 1
-        self.total_records = len(self.filtered_customers)
+        self.pagination["current_page"] = 1
+        self.current_page = 1  # Keep in sync
+        self.pagination["total_records"] = len(self.filtered_customers)
 
         # Reload the table with filtered data
         self.load_customers(refresh_all=False)
@@ -413,51 +423,71 @@ class CustomerGUI(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
-        max_visible_pages = 7
-        if total_pages <= max_visible_pages:
-            # Show all pages
-            for page in range(1, total_pages + 1):
+        current_page = self.pagination["current_page"]
+
+        # Always show first page
+        self.add_page_button(1)
+
+        # Calculate page range to show
+        if total_pages > 7:
+            # Show ellipsis after first page if needed
+            if current_page > 3:
+                self.page_buttons_layout.addWidget(self._create_ellipsis())
+
+            # Calculate range of pages to show around current page
+            start_page = max(2, current_page - 2)
+            end_page = min(total_pages - 1, current_page + 2)
+
+            # Show pages
+            for page in range(start_page, end_page + 1):
                 self.add_page_button(page)
+
+            # Show ellipsis before last page if needed
+            if current_page < total_pages - 2:
+                self.page_buttons_layout.addWidget(self._create_ellipsis())
+
         else:
-            # Show first pages
-            for page in range(1, 4):
+            # If total pages <= 7, show all pages
+            for page in range(2, total_pages + 1):
                 self.add_page_button(page)
 
-            # Add ellipsis
-            if self.current_page > 4:
-                ellipsis = QPushButton("...")
-                ellipsis.setEnabled(False)
-                ellipsis.setStyleSheet("background: none; border: none;")
-                self.page_buttons_layout.addWidget(ellipsis)
+        # Always show last page if more than one page
+        if total_pages > 1 and current_page != total_pages:
+            self.add_page_button(total_pages)
 
-            # Show current and surrounding pages
-            if 4 < self.current_page < total_pages - 3:
-                self.add_page_button(self.current_page)
-
-            # Add ending ellipsis
-            if self.current_page < total_pages - 3:
-                ellipsis = QPushButton("...")
-                ellipsis.setEnabled(False)
-                ellipsis.setStyleSheet("background: none; border: none;")
-                self.page_buttons_layout.addWidget(ellipsis)
-
-            # Show last pages
-            for page in range(total_pages - 2, total_pages + 1):
-                self.add_page_button(page)
+    def _create_ellipsis(self):
+        """Create ellipsis button for pagination."""
+        ellipsis = QPushButton("...")
+        ellipsis.setEnabled(False)
+        ellipsis.setFixedSize(40, 40)
+        ellipsis.setStyleSheet("""
+            QPushButton {
+                background: none;
+                border: none;
+                color: #666;
+                font-weight: bold;
+                min-width: 40px;
+            }
+        """)
+        return ellipsis
 
     def add_page_button(self, page_num: int) -> None:
         """Add a single page button."""
         button = QPushButton(str(page_num))
         button.setFixedSize(40, 40)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.setMinimumWidth(40)
+        button.setMaximumWidth(40)
 
-        if page_num == self.current_page:
+        if page_num == self.pagination["current_page"]:
             button.setStyleSheet("""
                 QPushButton {
                     background-color: skyblue;
                     color: white;
                     border-radius: 20px;
                     font-weight: bold;
+                    min-width: 40px;
+                    max-width: 40px;
                 }
             """)
         else:
@@ -467,6 +497,8 @@ class CustomerGUI(QWidget):
                     color: black;
                     border: 1px solid #ddd;
                     border-radius: 20px;
+                    min-width: 40px;
+                    max-width: 40px;
                 }
                 QPushButton:hover {
                     background-color: #f0f0f0;
@@ -485,96 +517,57 @@ class CustomerGUI(QWidget):
                         db_session=session
                     )
                     self.filtered_customers = self.all_customers.copy()
-                    self.total_records = len(self.all_customers)
 
+                total_records = len(self.filtered_customers)
                 total_pages = (
-                    self.total_records + self.page_size - 1
-                ) // self.page_size
+                    total_records + self.pagination["limit"] - 1
+                ) // self.pagination["limit"]
 
-                # Calculate offset
-                offset = (self.current_page - 1) * self.page_size
-
-                # Get paginated customers from filtered results
-                current_page_customers = self.filtered_customers[
-                    offset : offset + self.page_size
-                ]
-
-                # Set up table
-                self.customer_table.setRowCount(
-                    len(current_page_customers) + 1
+                # Update pagination state
+                self.pagination.update(
+                    {
+                        "total_records": total_records,
+                        "total_pages": total_pages,
+                    }
                 )
-                self.customer_table.setColumnCount(5)
 
-                # Update table contents
-                # Set column headers
-                column_names = ["ID", "Name", "Mobile", "Email", "Address"]
-                for col, name in enumerate(column_names):
-                    item = QTableWidgetItem(name)
-                    item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-                    font = item.font()
-                    font.setBold(True)
-                    item.setFont(font)
-                    self.customer_table.setItem(0, col, item)
+                # Calculate page data
+                start_idx = (
+                    self.pagination["current_page"] - 1
+                ) * self.pagination["limit"]
+                end_idx = start_idx + self.pagination["limit"]
+                current_page_records = self.filtered_customers[
+                    start_idx:end_idx
+                ]
+                self.pagination["records"] = current_page_records
 
-                # Populate table with current page data
-                for row, customer in enumerate(
-                    current_page_customers, start=1
-                ):
-                    self.customer_table.setItem(
-                        row, 0, QTableWidgetItem(str(customer.id))
+                # Update next/previous record IDs
+                if end_idx < total_records:
+                    self.pagination["next_record_id"] = (
+                        self.filtered_customers[end_idx].id
                     )
-                    self.customer_table.setItem(
-                        row, 1, QTableWidgetItem(customer.name)
+                else:
+                    self.pagination["next_record_id"] = None
+
+                if start_idx > 0:
+                    self.pagination["previous_record_id"] = (
+                        self.filtered_customers[start_idx - 1].id
                     )
-                    self.customer_table.setItem(
-                        row, 2, QTableWidgetItem(customer.mobile_number)
-                    )
-                    self.customer_table.setItem(
-                        row, 3, QTableWidgetItem(customer.email)
-                    )
-                    self.customer_table.setItem(
-                        row, 4, QTableWidgetItem(customer.address)
-                    )
+                else:
+                    self.pagination["previous_record_id"] = None
+
+                # Update table content
+                self._update_table_data(current_page_records)
 
                 # Update pagination buttons
                 self.update_pagination_buttons(total_pages)
 
-                # Update navigation buttons
-                self.prev_button.setEnabled(self.current_page > 1)
-                self.next_button.setEnabled(self.current_page < total_pages)
-
-                # Adjust table appearance
-                self.customer_table.resizeColumnsToContents()
-                self.customer_table.horizontalHeader().setStretchLastSection(
-                    True
+                # Enable/disable navigation buttons
+                self.prev_button.setEnabled(
+                    self.pagination["previous_record_id"] is not None
                 )
-                self.customer_table.horizontalHeader().setSectionResizeMode(
-                    QHeaderView.ResizeMode.Stretch
-                )
-
-                # Calculate row height based on content
-                row_height = 40  # Default height
-                visible_rows = min(
-                    len(current_page_customers) + 1, self.page_size + 1
-                )
-
-                # Set fixed row height
-                for row in range(visible_rows):
-                    self.customer_table.setRowHeight(row, row_height)
-
-                # Set table height to accommodate only visible rows
-                table_height = (row_height * visible_rows) + 20  # Add padding
-                self.customer_table.setMinimumHeight(0)
-                self.customer_table.setMaximumHeight(
-                    16777215
-                )  # Qt's maximum value
-
-                # Update table appearance for better scrolling
-                self.customer_table.setVerticalScrollBarPolicy(
-                    Qt.ScrollBarPolicy.ScrollBarAsNeeded
-                )
-                self.customer_table.setHorizontalScrollBarPolicy(
-                    Qt.ScrollBarPolicy.ScrollBarAsNeeded
+                self.next_button.setEnabled(
+                    self.pagination["next_record_id"] is not None
                 )
 
         except Exception as e:
@@ -582,25 +575,73 @@ class CustomerGUI(QWidget):
                 self, "Error", f"Failed to load customers: {e!s}"
             )
 
+    def _update_table_data(self, records):
+        """Update table data while preserving table properties."""
+        self.customer_table.setRowCount(len(records) + 1)  # +1 for header
+        self.customer_table.setColumnCount(5)
+
+        # Set headers
+        headers = ["ID", "Name", "Mobile", "Email", "Address"]
+        for col, header in enumerate(headers):
+            item = QTableWidgetItem(header)
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            self.customer_table.setItem(0, col, item)
+
+        # Populate data
+        for row, customer in enumerate(records, start=1):
+            self.customer_table.setItem(
+                row, 0, QTableWidgetItem(str(customer.id))
+            )
+            self.customer_table.setItem(
+                row, 1, QTableWidgetItem(customer.name)
+            )
+            self.customer_table.setItem(
+                row, 2, QTableWidgetItem(customer.mobile_number)
+            )
+            self.customer_table.setItem(
+                row, 3, QTableWidgetItem(customer.email)
+            )
+            self.customer_table.setItem(
+                row, 4, QTableWidgetItem(customer.address)
+            )
+
+        # Maintain table appearance
+        self.customer_table.resizeColumnsToContents()
+        self.customer_table.horizontalHeader().setStretchLastSection(True)
+        self.customer_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+
+        # Set consistent row heights
+        row_height = 40
+        for row in range(self.customer_table.rowCount()):
+            self.customer_table.setRowHeight(row, row_height)
+
     def next_page(self) -> None:
         """Load the next page of customers."""
-        total_pages = (
-            self.total_records + self.page_size - 1
-        ) // self.page_size
-        if self.current_page < total_pages:
-            self.current_page += 1
+        if self.pagination["next_record_id"] is not None:
+            self.pagination["current_page"] += 1
+            self.current_page = self.pagination["current_page"]  # Keep in sync
             self.load_customers(refresh_all=False)
 
     def previous_page(self) -> None:
         """Load the previous page of customers."""
-        if self.current_page > 1:
-            self.current_page -= 1
+        if self.pagination["previous_record_id"] is not None:
+            self.pagination["current_page"] -= 1
+            self.current_page = self.pagination["current_page"]  # Keep in sync
             self.load_customers(refresh_all=False)
 
     def go_to_page(self, page_number):
         """Navigate to specific page number."""
-        if page_number != self.current_page:
-            self.current_page = page_number
+        if (
+            1 <= page_number <= self.pagination["total_pages"]
+            and page_number != self.pagination["current_page"]
+        ):
+            self.pagination["current_page"] = page_number
+            self.current_page = page_number  # Keep in sync
             self.load_customers(refresh_all=False)
 
     def add_customer(self) -> None:

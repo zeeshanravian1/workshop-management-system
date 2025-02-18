@@ -4,6 +4,7 @@ import sys
 
 from faker import Faker
 from PyQt6.QtWidgets import QApplication
+from sqlmodel import select
 
 from workshop_management_system.database.session import get_session
 from workshop_management_system.v1.customer.gui import CustomerGUI
@@ -21,7 +22,7 @@ def generate_sample_customers(num_records=1000):
         try:
             customer = Customer(
                 name=fake.name(),
-                mobile_number=f"+{fake.random_int(min=1, max=99)}{fake.msisdn()[3:12]}",
+                mobile_number=f"+{fake.random_int(min=1, max=99)}-{fake.msisdn()[3:12]}",
                 email=fake.email(),
                 address=fake.address().replace("\n", ", "),
                 is_deleted=False,
@@ -42,14 +43,16 @@ def setup_database():
         customer_view = CustomerView(Customer)
 
         with get_session() as session:
-            # Clear existing data
+            # Clear existing data using SQLModel's session.exec()
             print("\nClearing existing customer data...")
-            session.query(Customer).delete()
+            statement = select(Customer)
+            results = session.exec(statement).all()
+            for result in results:
+                session.delete(result)
             session.commit()
 
             # Generate and add new sample data
             customers = generate_sample_customers(1000)
-
             print("\nAdding customers to database...")
             count = 0
             for customer in customers:
