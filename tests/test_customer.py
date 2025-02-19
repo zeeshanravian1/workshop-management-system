@@ -337,30 +337,25 @@ class TestCustomer(TestSetup):
     def test_update_duplicate_email_validation(self) -> None:
         """Validating duplicate email during update."""
         # Create first customer
-        self.customer_view.create(
+        customer_1: Customer = self.customer_view.create(
             db_session=self.session,
             record=Customer(**self.test_customer_1.model_dump()),
         )
 
         # Create second customer
-        customer: Customer = self.customer_view.create(
+        customer_2: Customer = self.customer_view.create(
             db_session=self.session,
             record=Customer(**self.test_customer_2.model_dump()),
         )
 
         # Update second customer with email of first customer
-        duplicate_email_customer: CustomerBase = CustomerBase(
-            name="Test Customer",
-            email="test1@example.com",
-            contact_no=PhoneNumber("+923021234567"),
-            address="Test Address",
-        )
+        customer_2.email = customer_1.email
 
         with pytest.raises(IntegrityError) as exc_info:
             self.customer_view.update_by_id(
                 db_session=self.session,
-                record_id=customer.id,
-                record=Customer(**duplicate_email_customer.model_dump()),
+                record_id=customer_2.id,
+                record=customer_2,
             )
 
         assert "UNIQUE constraint failed: customer.email" in str(
@@ -369,30 +364,26 @@ class TestCustomer(TestSetup):
 
     def test_update_duplicate_contact_no_validation(self) -> None:
         """Validating duplicate contact number during update."""
-        self.customer_view.create(
+        # Create first customer
+        customer_1: Customer = self.customer_view.create(
             db_session=self.session,
             record=Customer(**self.test_customer_1.model_dump()),
         )
 
         # Create second customer
-        customer: Customer = self.customer_view.create(
+        customer_2: Customer = self.customer_view.create(
             db_session=self.session,
             record=Customer(**self.test_customer_2.model_dump()),
         )
 
         # Update second customer with contact number of first customer
-        duplicate_contact_no_customer: CustomerBase = CustomerBase(
-            name="Test Customer",
-            email="test@example.com",
-            contact_no=PhoneNumber("+923001234567"),
-            address="Test Address",
-        )
+        customer_2.contact_no = customer_1.contact_no
 
         with pytest.raises(IntegrityError) as exc_info:
             self.customer_view.update_by_id(
                 db_session=self.session,
-                record_id=customer.id,
-                record=Customer(**duplicate_contact_no_customer.model_dump()),
+                record_id=customer_2.id,
+                record=customer_2,
             )
 
         assert "UNIQUE constraint failed: customer.contact_no" in str(

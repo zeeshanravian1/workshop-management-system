@@ -337,30 +337,25 @@ class TestSupplier(TestSetup):
     def test_update_duplicate_email_validation(self) -> None:
         """Validating duplicate email during update."""
         # Create first supplier
-        self.supplier_view.create(
+        supplier_1: Supplier = self.supplier_view.create(
             db_session=self.session,
             record=Supplier(**self.test_supplier_1.model_dump()),
         )
 
         # Create second supplier
-        supplier: Supplier = self.supplier_view.create(
+        supplier_2: Supplier = self.supplier_view.create(
             db_session=self.session,
             record=Supplier(**self.test_supplier_2.model_dump()),
         )
 
         # Update second supplier with email of first supplier
-        duplicate_email_supplier: SupplierBase = SupplierBase(
-            name="Test Supplier",
-            email="test1@example.com",
-            contact_no=PhoneNumber("+923021234567"),
-            address="Test Address",
-        )
+        supplier_2.email = supplier_1.email
 
         with pytest.raises(IntegrityError) as exc_info:
             self.supplier_view.update_by_id(
                 db_session=self.session,
-                record_id=supplier.id,
-                record=Supplier(**duplicate_email_supplier.model_dump()),
+                record_id=supplier_2.id,
+                record=supplier_2,
             )
 
         assert "UNIQUE constraint failed: supplier.email" in str(
@@ -369,30 +364,25 @@ class TestSupplier(TestSetup):
 
     def test_update_duplicate_contact_no_validation(self) -> None:
         """Validating duplicate contact number during update."""
-        self.supplier_view.create(
+        supplier_1: Supplier = self.supplier_view.create(
             db_session=self.session,
             record=Supplier(**self.test_supplier_1.model_dump()),
         )
 
         # Create second supplier
-        supplier: Supplier = self.supplier_view.create(
+        supplier_2: Supplier = self.supplier_view.create(
             db_session=self.session,
             record=Supplier(**self.test_supplier_2.model_dump()),
         )
 
         # Update second supplier with contact number of first supplier
-        duplicate_contact_no_supplier: SupplierBase = SupplierBase(
-            name="Test Supplier",
-            email="test@example.com",
-            contact_no=PhoneNumber("+923001234567"),
-            address="Test Address",
-        )
+        supplier_2.contact_no = supplier_1.contact_no
 
         with pytest.raises(IntegrityError) as exc_info:
             self.supplier_view.update_by_id(
                 db_session=self.session,
-                record_id=supplier.id,
-                record=Supplier(**duplicate_contact_no_supplier.model_dump()),
+                record_id=supplier_2.id,
+                record=supplier_2,
             )
 
         assert "UNIQUE constraint failed: supplier.contact_no" in str(

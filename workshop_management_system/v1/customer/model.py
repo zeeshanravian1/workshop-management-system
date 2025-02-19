@@ -7,7 +7,7 @@ Description:
 
 from pydantic import EmailStr
 from pydantic_extra_types.phone_numbers import PhoneNumber
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
 
 from workshop_management_system.database.connection import Base
 
@@ -50,3 +50,7 @@ class Customer(Base, CustomerBase, table=True):
     - `updated_at (datetime)`: Timestamp when customer was last updated.
 
     """
+
+    vehicles: list["Vehicle"] = Relationship(  # type: ignore # noqa: F821
+        back_populates="customer", cascade_delete=True
+    )
