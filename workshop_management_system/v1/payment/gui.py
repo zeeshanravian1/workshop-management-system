@@ -107,6 +107,18 @@ class PaymentDialog(QDialog):
             "balance": float(self.balance_input.text()),
         }
 
+    def set_data(self, payment_data: dict) -> None:
+        """Set the dialog's fields with existing payment data."""
+        self.customer_id_input.setText(str(payment_data.get("customer_id", "")))
+        self.job_card_id_input.setText(str(payment_data.get("job_card_id", "")))
+        self.amount_input.setText(str(payment_data.get("amount", "")))
+        self.payment_date_input.setText(str(payment_data.get("payment_date", ""))[:10])  # Get just the date part
+        self.payment_method_input.setText(payment_data.get("payment_method", ""))
+        self.reference_number_input.setText(payment_data.get("reference_number", ""))
+        self.status_input.setText(payment_data.get("status", ""))
+        self.credit_input.setText(str(payment_data.get("credit", "")))
+        self.balance_input.setText(str(payment_data.get("balance", "")))
+
 
 class PaymentGUI(QWidget):
     """Payment GUI Class."""
@@ -459,53 +471,56 @@ class PaymentGUI(QWidget):
     def update_payment(self) -> None:
         """Update an existing payment."""
         selected_row = self.payment_table.currentRow()
-        if selected_row == -1:
+        if selected_row <= 0:  # Skip header row
             QMessageBox.warning(
                 self, "Warning", "Please select a payment to update."
             )
             return
 
-        item = self.payment_table.item(selected_row, 0)
-        if item is None:
-            QMessageBox.warning(
-                self, "Warning", "Selected payment ID is invalid."
-            )
-            return
-        payment_id = item.text()
+        try:
+            payment_id = int(self.payment_table.item(selected_row, 0).text())
 
-        dialog = PaymentDialog(self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            data = dialog.get_data()
-            try:
+            # Get current values from the table
+            current_data = {
+                "customer_id": self.payment_table.item(selected_row, 1).text(),
+                "job_card_id": self.payment_table.item(selected_row, 2).text(),
+                "amount": self.payment_table.item(selected_row, 3).text(),
+                "credit": self.payment_table.item(selected_row, 4).text(),
+                "balance": self.payment_table.item(selected_row, 5).text(),
+                "payment_date": self.payment_table.item(selected_row, 6).text(),
+                "payment_method": self.payment_table.item(selected_row, 7).text(),
+                "reference_number": self.payment_table.item(selected_row, 8).text(),
+                "status": self.payment_table.item(selected_row, 9).text()
+            }
+
+            dialog = PaymentDialog(self)
+            dialog.set_data(current_data)  # Pre-fill the dialog with current data
+
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                data = dialog.get_data()
                 with Session(engine) as session:
                     payment_obj = self.payment_view.read_by_id(
-                        db_session=session, record_id=int(payment_id)
+                        db_session=session, record_id=payment_id
                     )
                     if payment_obj:
-                        payment_obj.customer_id = data["customer_id"]
-                        payment_obj.job_card_id = data["job_card_id"]
-                        payment_obj.amount = data["amount"]
-                        payment_obj.credit = data["credit"]
-                        payment_obj.balance = data["balance"]
-                        payment_obj.payment_date = datetime.strptime(
-                            data["payment_date"], "%Y-%m-%d"
-                        )
-                        payment_obj.payment_method = data["payment_method"]
-                        payment_obj.reference_number = data["reference_number"]
-                        payment_obj.status = data["status"]
+                        # Update payment object with new data
+                        for key, value in data.items():
+                            setattr(payment_obj, key, value)
+
                         self.payment_view.update(
                             db_session=session,
-                            record_id=int(payment_id),
+                            record_id=payment_id,
                             record=payment_obj,
                         )
                         QMessageBox.information(
                             self, "Success", "Payment updated successfully!"
                         )
                         self.load_payments()
-            except Exception as e:
-                QMessageBox.critical(
-                    self, "Error", f"Failed to update payment: {e!s}"
-                )
+
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Error", f"Failed to update payment: {e!s}"
+            )
 
     def delete_payment(self) -> None:
         """Delete a payment from the database."""
@@ -608,27 +623,47 @@ class PaymentGUI(QWidget):
             if current_page <= 3:
                 # Near start - show first few pages
                 for page in range(2, 6):
-                    self.add_page_button(page)
+                    if page <= total_pages:  # Check if page number is valid
+                        self.add_page_button(page)
             elif current_page >= total_pages - 2:
                 # Near end - show last few pages
                 for page in range(total_pages - 4, total_pages):
-                    self.add_page_button(page)
+                    if page > 1:  # Only show if page number is greater than 1
+                        self.add_page_button(page)
             else:
                 # In middle - show pages around current
                 for page in range(current_page - 2, current_page + 3):
-                    if 1 < page < total_pages:
+                    if (
+                        1 < page < total_pages
+                    ):  # Ensure we don't duplicate first/last pages
                         self.add_page_button(page)
 
             # Show ellipsis before last page if needed
             if current_page < total_pages - 3:
                 self.page_buttons_layout.addWidget(self._create_ellipsis())
+
         else:
-            # For small number of pages, show all pages
+            # For small number of pages, show all pages without duplicates
             for page in range(2, total_pages + 1):
                 self.add_page_button(page)
 
-        # Always show last page if more than one page
-        if total_pages > 1:
+        # Only show last page button if it's not already shown and there's more than one page
+        if (
+            total_pages > 1
+            and current_page != total_pages
+            and total_pages
+            not in [
+                int(self.page_buttons_layout.itemAt(i).widget().text())
+                for i in range(self.page_buttons_layout.count())
+                if isinstance(
+                    self.page_buttons_layout.itemAt(i).widget(), QPushButton
+                )
+                and self.page_buttons_layout.itemAt(i)
+                .widget()
+                .text()
+                .isdigit()
+            ]
+        ):
             self.add_page_button(total_pages)
 
     def _create_ellipsis(self):
