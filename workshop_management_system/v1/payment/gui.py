@@ -109,15 +109,25 @@ class PaymentDialog(QDialog):
 
     def set_data(self, payment_data: dict) -> None:
         """Set the dialog's fields with existing payment data."""
-        self.customer_id_input.setText(str(payment_data.get("customer_id", "")))
-        self.job_card_id_input.setText(str(payment_data.get("job_card_id", "")))
-        self.amount_input.setText(str(payment_data.get("amount", "")))
-        self.payment_date_input.setText(str(payment_data.get("payment_date", ""))[:10])  # Get just the date part
-        self.payment_method_input.setText(payment_data.get("payment_method", ""))
-        self.reference_number_input.setText(payment_data.get("reference_number", ""))
-        self.status_input.setText(payment_data.get("status", ""))
-        self.credit_input.setText(str(payment_data.get("credit", "")))
-        self.balance_input.setText(str(payment_data.get("balance", "")))
+        self.customer_id_input.setText(
+            str(payment_data.get("customer_id", "")))
+        self.job_card_id_input.setText(
+            str(payment_data.get("job_card_id", ""))
+        )
+        self.amount_input.setText(
+            str(payment_data.get("amount", "")))
+        self.payment_date_input.setText(
+            str(payment_data.get("payment_date", ""))[:10])
+        self.payment_method_input.setText(
+            payment_data.get("payment_method", ""))
+        self.reference_number_input.setText(
+            payment_data.get("reference_number", ""))
+        self.status_input.setText(
+            payment_data.get("status", ""))
+        self.credit_input.setText(
+            str(payment_data.get("credit", "")))
+        self.balance_input.setText(
+            str(payment_data.get("balance", "")))
 
 
 class PaymentGUI(QWidget):
@@ -259,6 +269,7 @@ class PaymentGUI(QWidget):
                 background: #a8a8a8;
             }
         """)
+
         self.payment_table.verticalHeader().setVisible(False)
         self.payment_table.horizontalHeader().setVisible(False)
         self.payment_table.setEditTriggers(
@@ -363,7 +374,7 @@ class PaymentGUI(QWidget):
                     self.all_payments = self.payment_view.read_all(
                         db_session=session
                     )
-                    self.filtered_payments = self.all_payments.copy()
+                    self.filtered_payments = self.all_payments[:]
 
                 total_records = len(self.filtered_payments)
                 total_pages = (
@@ -494,7 +505,7 @@ class PaymentGUI(QWidget):
             }
 
             dialog = PaymentDialog(self)
-            dialog.set_data(current_data)  # Pre-fill the dialog with current data
+            dialog.set_data(current_data)
 
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 data = dialog.get_data()
@@ -567,7 +578,7 @@ class PaymentGUI(QWidget):
         criteria = self.search_criteria.currentText().lower()
 
         # Filter all payments
-        self.filtered_payments = self.all_payments.copy()
+        self.filtered_payments = list(self.all_payments)
         if search_text:
             self.filtered_payments = [
                 payment
@@ -647,7 +658,8 @@ class PaymentGUI(QWidget):
             for page in range(2, total_pages + 1):
                 self.add_page_button(page)
 
-        # Only show last page button if it's not already shown and there's more than one page
+        # Only show last page button if it's not already shown and
+        # there's more than one page
         if (
             total_pages > 1
             and current_page != total_pages
