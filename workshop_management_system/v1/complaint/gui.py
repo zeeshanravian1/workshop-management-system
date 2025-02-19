@@ -152,6 +152,7 @@ class ComplaintGUI(QWidget):
                 background-color: white;
                 border-radius: 5px;
                 padding: 5px;
+                outline: 0;
             }
             QTableWidget::item {
                 padding: 5px;
@@ -161,6 +162,8 @@ class ComplaintGUI(QWidget):
             QTableWidget::item:selected {
                 background-color: #e6f3ff;
                 color: black;
+                border: none;
+                outline: none;
             }
         """)
 
@@ -256,8 +259,12 @@ class ComplaintGUI(QWidget):
                 background: #a8a8a8;
             }
         """)
-        self.complaint_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.complaint_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.complaint_table.setEditTriggers(
+            QTableWidget.EditTrigger.NoEditTriggers
+        )
+        self.complaint_table.setSelectionMode(
+            QTableWidget.SelectionMode.NoSelection
+        )
         self.complaint_table.horizontalHeader().setStretchLastSection(True)
         self.complaint_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -666,32 +673,41 @@ class ComplaintGUI(QWidget):
             )
 
     def search_complaints(self) -> None:
-        """Filter complaints based on search criteria."""
+        """Filter complaints based on search criteria across all data."""
         search_text = self.search_input.text().lower()
         criteria = self.search_criteria.currentText().lower()
 
-        for row in range(
-            1, self.complaint_table.rowCount()
-        ):  # Start from 1 to skip header
-            show_row = True
-            if search_text:
-                cell_text = ""
-                if criteria == "customer":
-                    cell_text = self.complaint_table.item(row, 1)
-                elif criteria == "description":
-                    cell_text = self.complaint_table.item(row, 2)
-                elif criteria == "priority":
-                    cell_text = self.complaint_table.item(row, 3)
-                elif criteria == "status":
-                    cell_text = self.complaint_table.item(row, 4)
+        # Filter all complaints
+        self.filtered_complaints = self.all_complaints.copy()
+        if search_text:
+            self.filtered_complaints = []
+            with Session(engine) as session:
+                for complaint in self.all_complaints:
+                    match = False
+                    if criteria == "customer":
+                        customer = session.get(Customer, complaint.customer_id)
+                        if customer and search_text in customer.name.lower():
+                            match = True
+                    elif criteria == "description":
+                        if search_text in complaint.description.lower():
+                            match = True
+                    elif criteria == "priority":
+                        if search_text in complaint.priority.lower():
+                            match = True
+                    elif criteria == "status":
+                        if search_text in complaint.status.lower():
+                            match = True
 
-                if (
-                    cell_text
-                    and cell_text.text().lower().find(search_text) == -1
-                ):
-                    show_row = False
+                    if match:
+                        self.filtered_complaints.append(complaint)
 
-            self.complaint_table.setRowHidden(row, not show_row)
+        # Reset pagination
+        self.pagination["current_page"] = 1
+        self.current_page = 1  # Keep in sync
+        self.pagination["total_records"] = len(self.filtered_complaints)
+
+        # Reload the table with filtered data
+        self.load_complaints(refresh_all=False)
 
     def update_pagination_buttons(self, total_pages: int) -> None:
         """Update the pagination buttons."""
