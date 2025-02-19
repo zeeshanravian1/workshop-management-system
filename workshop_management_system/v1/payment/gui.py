@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QTableWidget,
-    QTableWidgetItem,
+    QTableWidgetItem,  # Add this import
     QVBoxLayout,
     QWidget,
 )
@@ -115,6 +115,23 @@ class PaymentGUI(QWidget):
         """Initialize the Payment GUI."""
         super().__init__(parent)
         self.parent_widget = parent
+        # Add pagination dictionary to match base model
+        self.pagination = {
+            "current_page": 1,
+            "limit": 15,
+            "total_pages": 0,
+            "total_records": 0,
+            "next_record_id": None,
+            "previous_record_id": None,
+            "records": [],
+        }
+        # Keep compatibility properties
+        self.page_size = self.pagination["limit"]
+        self.current_page = self.pagination["current_page"]
+        self.all_payments = []
+        self.filtered_payments = []
+
+        # Update theme to match other GUIs
         self.setStyleSheet("""
             QWidget {
                 background-color: white;
@@ -123,39 +140,28 @@ class PaymentGUI(QWidget):
             QPushButton {
                 padding: 10px;
                 font-size: 14px;
-                background-color: #4CAF50;
+                background-color: skyblue;
                 color: white;
                 border-radius: 5px;
                 min-width: 120px;
                 margin: 5px;
             }
             QPushButton:hover {
-                background-color: #45a049;
-                min-width: 125px;
+                background-color: #ADD8E6;
+                margin: 0px;
             }
             QTableWidget {
                 background-color: white;
                 border-radius: 5px;
                 padding: 5px;
-                border: 1px solid black;  /* Add border to the table */
             }
             QTableWidget::item {
                 padding: 5px;
                 color: black;
                 background-color: white;
-                border: none;
             }
             QTableWidget::item:selected {
-                background-color: green;
-                color: white;
-            }
-            QHeaderView::section {
-                background-color: white;
-                color: black;
-                padding: 5px;
-                border: none;
-            }
-            QLabel {
+                background-color: #e6f3ff;
                 color: black;
             }
         """)
@@ -212,26 +218,33 @@ class PaymentGUI(QWidget):
         self.payment_table.setAlternatingRowColors(True)
         self.payment_table.setStyleSheet("""
             QTableWidget {
+                border: 1px solid black;
                 background-color: white;
                 border-radius: 5px;
                 padding: 5px;
-                border: 1px solid black;  /* Add border to the table */
+                margin: 0px;
             }
             QTableWidget::item {
-                padding: 5px;
-                color: black;
-                background-color: white;
                 border: none;
+                padding: 5px;
             }
             QTableWidget::item:selected {
-                background-color: green;
-                color: white;
-            }
-            QHeaderView::section {
-                background-color: white;
+                background-color: #e6f3ff;
                 color: black;
-                padding: 5px;
+            }
+            QScrollBar:vertical {
                 border: none;
+                background: #f0f0f0;
+                width: 10px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #c1c1c1;
+                min-height: 30px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #a8a8a8;
             }
         """)
         self.payment_table.verticalHeader().setVisible(False)
@@ -277,6 +290,52 @@ class PaymentGUI(QWidget):
 
         main_layout.addWidget(button_frame)
 
+        # Add pagination frame
+        pagination_frame = QFrame()
+        pagination_layout = QHBoxLayout(pagination_frame)
+        pagination_layout.setSpacing(5)
+
+        # Previous button
+        self.prev_button = QPushButton("Previous")
+        self.prev_button.clicked.connect(self.previous_page)
+        self.prev_button.setStyleSheet("""
+            QPushButton {
+                background-color: skyblue;
+                padding: 8px 15px;
+                border-radius: 5px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #ADD8E6;
+            }
+        """)
+
+        # Page number buttons container
+        self.page_buttons_layout = QHBoxLayout()
+        self.page_buttons_layout.setSpacing(5)
+
+        # Next button
+        self.next_button = QPushButton("Next")
+        self.next_button.clicked.connect(self.next_page)
+        self.next_button.setStyleSheet("""
+            QPushButton {
+                background-color: skyblue;
+                padding: 8px 15px;
+                border-radius: 5px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: #ADD8E6;
+            }
+        """)
+
+        pagination_layout.addWidget(self.prev_button)
+        pagination_layout.addLayout(self.page_buttons_layout)
+        pagination_layout.addWidget(self.next_button)
+        pagination_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        main_layout.addWidget(pagination_frame)
+
         self.load_payments()
 
     def back_to_home(self) -> None:
@@ -284,92 +343,66 @@ class PaymentGUI(QWidget):
         if self.parent_widget:
             self.parent_widget.back_to_home()
 
-    def load_payments(self) -> None:
-        """Load payments from the database and display them in the table."""
+    def load_payments(self, refresh_all=True) -> None:
+        """Load payments with pagination."""
         try:
             with Session(engine) as session:
-                payments = self.payment_view.read_all(db_session=session)
-                self.payment_table.setRowCount(len(payments) + 1)
-                self.payment_table.setColumnCount(10)
-                self.payment_table.setHorizontalHeaderLabels(
-                    [
-                        "ID",
-                        "Customer ID",
-                        "Job Card ID",
-                        "Amount",
-                        "Credit",
-                        "Balance",
-                        "Payment Date",
-                        "Payment Method",
-                        "Reference Number",
-                        "Status",
-                    ]
+                if refresh_all:
+                    self.all_payments = self.payment_view.read_all(
+                        db_session=session
+                    )
+                    self.filtered_payments = self.all_payments.copy()
+
+                total_records = len(self.filtered_payments)
+                total_pages = (
+                    total_records + self.pagination["limit"] - 1
+                ) // self.pagination["limit"]
+
+                # Update pagination state
+                self.pagination.update(
+                    {
+                        "total_records": total_records,
+                        "total_pages": total_pages,
+                    }
                 )
 
-                # Set column names in the first row
-                column_names = [
-                    "ID",
-                    "Customer ID",
-                    "Job Card ID",
-                    "Amount",
-                    "Credit",
-                    "Balance",
-                    "Payment Date",
-                    "Payment Method",
-                    "Reference Number",
-                    "Status",
+                # Calculate page data
+                start_idx = (
+                    self.pagination["current_page"] - 1
+                ) * self.pagination["limit"]
+                end_idx = start_idx + self.pagination["limit"]
+                current_page_records = self.filtered_payments[
+                    start_idx:end_idx
                 ]
-                for col, name in enumerate(column_names):
-                    item = QTableWidgetItem(name)
-                    item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-                    font = item.font()
-                    font.setBold(True)
-                    item.setFont(font)
-                    self.payment_table.setItem(0, col, item)
+                self.pagination["records"] = current_page_records
 
-                # Set the height of the first row
-                self.payment_table.setRowHeight(0, 40)
+                # Update next/previous record IDs
+                if end_idx < total_records:
+                    self.pagination["next_record_id"] = self.filtered_payments[
+                        end_idx
+                    ].id
+                else:
+                    self.pagination["next_record_id"] = None
 
-                for row, payment in enumerate(payments, start=1):
-                    self.payment_table.setItem(
-                        row, 0, QTableWidgetItem(str(payment.id))
+                if start_idx > 0:
+                    self.pagination["previous_record_id"] = (
+                        self.filtered_payments[start_idx - 1].id
                     )
-                    self.payment_table.setItem(
-                        row, 1, QTableWidgetItem(str(payment.customer_id))
-                    )
-                    self.payment_table.setItem(
-                        row, 2, QTableWidgetItem(str(payment.job_card_id))
-                    )
-                    self.payment_table.setItem(
-                        row, 3, QTableWidgetItem(str(payment.amount))
-                    )
-                    self.payment_table.setItem(
-                        row, 4, QTableWidgetItem(str(payment.credit))
-                    )
-                    self.payment_table.setItem(
-                        row, 5, QTableWidgetItem(str(payment.balance))
-                    )
-                    self.payment_table.setItem(
-                        row, 6, QTableWidgetItem(str(payment.payment_date))
-                    )
-                    self.payment_table.setItem(
-                        row, 7, QTableWidgetItem(payment.payment_method)
-                    )
-                    self.payment_table.setItem(
-                        row, 8, QTableWidgetItem(payment.reference_number)
-                    )
-                    self.payment_table.setItem(
-                        row, 9, QTableWidgetItem(payment.status)
-                    )
+                else:
+                    self.pagination["previous_record_id"] = None
 
-                # Adjust column widths
-                self.payment_table.resizeColumnsToContents()
-                self.payment_table.horizontalHeader().setStretchLastSection(
-                    True
+                # Update table content
+                self._update_table_data(current_page_records)
+
+                # Update pagination UI
+                self.update_pagination_buttons(total_pages)
+                self.prev_button.setEnabled(
+                    self.pagination["previous_record_id"] is not None
                 )
-                self.payment_table.horizontalHeader().setSectionResizeMode(
-                    QHeaderView.ResizeMode.Stretch
+                self.next_button.setEnabled(
+                    self.pagination["next_record_id"] is not None
                 )
+
         except Exception as e:
             QMessageBox.critical(
                 self, "Error", f"Failed to load payments: {e!s}"
@@ -514,32 +547,237 @@ class PaymentGUI(QWidget):
             )
 
     def search_payments(self) -> None:
-        """Filter payments based on search criteria."""
+        """Filter payments based on search criteria across all data."""
         search_text = self.search_input.text().lower()
         criteria = self.search_criteria.currentText().lower()
 
-        for row in range(
-            1, self.payment_table.rowCount()
-        ):  # Start from 1 to skip header
-            show_row = True
-            if search_text:
-                cell_text = ""
-                if criteria == "customer id":
-                    cell_text = self.payment_table.item(row, 1)
-                elif criteria == "job card id":
-                    cell_text = self.payment_table.item(row, 2)
-                elif criteria == "payment method":
-                    cell_text = self.payment_table.item(row, 7)
-                elif criteria == "status":
-                    cell_text = self.payment_table.item(row, 9)
-
+        # Filter all payments
+        self.filtered_payments = self.all_payments.copy()
+        if search_text:
+            self.filtered_payments = [
+                payment
+                for payment in self.all_payments
                 if (
-                    cell_text
-                    and cell_text.text().lower().find(search_text) == -1
-                ):
-                    show_row = False
+                    (
+                        criteria == "customer id"
+                        and search_text in str(payment.customer_id).lower()
+                    )
+                    or (
+                        criteria == "job card id"
+                        and search_text in str(payment.job_card_id).lower()
+                    )
+                    or (
+                        criteria == "payment method"
+                        and search_text in payment.payment_method.lower()
+                    )
+                    or (
+                        criteria == "status"
+                        and search_text in payment.status.lower()
+                    )
+                )
+            ]
 
-            self.payment_table.setRowHidden(row, not show_row)
+        # Reset pagination
+        self.pagination["current_page"] = 1
+        self.current_page = 1  # Keep in sync
+        self.pagination["total_records"] = len(self.filtered_payments)
+
+        # Reload table with filtered data
+        self.load_payments(refresh_all=False)
+
+    # Add these new pagination methods
+    def update_pagination_buttons(self, total_pages: int) -> None:
+        """Update the pagination buttons."""
+        # Clear existing buttons
+        while self.page_buttons_layout.count():
+            item = self.page_buttons_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        current_page = self.pagination["current_page"]
+
+        # Always show first page
+        self.add_page_button(1)
+
+        if total_pages > 7:
+            # Show ellipsis after first page if needed
+            if current_page > 3:
+                self.page_buttons_layout.addWidget(self._create_ellipsis())
+
+            # Show pages around current page
+            if current_page <= 3:
+                # Near start - show first few pages
+                for page in range(2, 6):
+                    self.add_page_button(page)
+            elif current_page >= total_pages - 2:
+                # Near end - show last few pages
+                for page in range(total_pages - 4, total_pages):
+                    self.add_page_button(page)
+            else:
+                # In middle - show pages around current
+                for page in range(current_page - 2, current_page + 3):
+                    if 1 < page < total_pages:
+                        self.add_page_button(page)
+
+            # Show ellipsis before last page if needed
+            if current_page < total_pages - 3:
+                self.page_buttons_layout.addWidget(self._create_ellipsis())
+        else:
+            # For small number of pages, show all pages
+            for page in range(2, total_pages + 1):
+                self.add_page_button(page)
+
+        # Always show last page if more than one page
+        if total_pages > 1:
+            self.add_page_button(total_pages)
+
+    def _create_ellipsis(self):
+        """Create ellipsis button for pagination."""
+        ellipsis = QPushButton("...")
+        ellipsis.setEnabled(False)
+        ellipsis.setFixedSize(40, 40)
+        ellipsis.setStyleSheet("""
+            QPushButton {
+                background: none;
+                border: none;
+                color: #666;
+                font-weight: bold;
+                min-width: 40px;
+            }
+        """)
+        return ellipsis
+
+    def add_page_button(self, page_num: int) -> None:
+        """Add a single page button."""
+        button = QPushButton(str(page_num))
+        button.setFixedSize(40, 40)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.setMinimumWidth(40)
+        button.setMaximumWidth(40)
+
+        if page_num == self.pagination["current_page"]:
+            button.setStyleSheet("""
+                QPushButton {
+                    background-color: skyblue;
+                    color: white;
+                    border-radius: 20px;
+                    font-weight: bold;
+                    min-width: 40px;
+                    max-width: 40px;
+                }
+            """)
+        else:
+            button.setStyleSheet("""
+                QPushButton {
+                    background-color: white;
+                    color: black;
+                    border: 1px solid #ddd;
+                    border-radius: 20px;
+                    min-width: 40px;
+                    max-width: 40px;
+                }
+                QPushButton:hover {
+                    background-color: #f0f0f0;
+                }
+            """)
+
+        button.clicked.connect(lambda checked, p=page_num: self.go_to_page(p))
+        self.page_buttons_layout.addWidget(button)
+
+    def next_page(self) -> None:
+        """Load the next page of payments."""
+        if self.pagination["next_record_id"] is not None:
+            self.pagination["current_page"] += 1
+            self.current_page = self.pagination["current_page"]
+            self.load_payments(refresh_all=False)
+
+    def previous_page(self) -> None:
+        """Load the previous page of payments."""
+        if self.pagination["previous_record_id"] is not None:
+            self.pagination["current_page"] -= 1
+            self.current_page = self.pagination["current_page"]
+            self.load_payments(refresh_all=False)
+
+    def go_to_page(self, page_number: int) -> None:
+        """Navigate to specific page number."""
+        if (
+            1 <= page_number <= self.pagination["total_pages"]
+            and page_number != self.pagination["current_page"]
+        ):
+            self.pagination["current_page"] = page_number
+            self.current_page = page_number
+            self.load_payments(refresh_all=False)
+
+    def _update_table_data(self, records):
+        """Update table data while preserving table properties."""
+        self.payment_table.setRowCount(len(records) + 1)  # +1 for header
+        self.payment_table.setColumnCount(10)
+
+        # Set headers
+        headers = [
+            "ID",
+            "Customer ID",
+            "Job Card ID",
+            "Amount",
+            "Credit",
+            "Balance",
+            "Payment Date",
+            "Payment Method",
+            "Reference Number",
+            "Status",
+        ]
+        for col, header in enumerate(headers):
+            item = QTableWidgetItem(header)
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            self.payment_table.setItem(0, col, item)
+
+        # Populate data
+        for row, payment in enumerate(records, start=1):
+            self.payment_table.setItem(
+                row, 0, QTableWidgetItem(str(payment.id))
+            )
+            self.payment_table.setItem(
+                row, 1, QTableWidgetItem(str(payment.customer_id))
+            )
+            self.payment_table.setItem(
+                row, 2, QTableWidgetItem(str(payment.job_card_id))
+            )
+            self.payment_table.setItem(
+                row, 3, QTableWidgetItem(str(payment.amount))
+            )
+            self.payment_table.setItem(
+                row, 4, QTableWidgetItem(str(payment.credit))
+            )
+            self.payment_table.setItem(
+                row, 5, QTableWidgetItem(str(payment.balance))
+            )
+            self.payment_table.setItem(
+                row, 6, QTableWidgetItem(str(payment.payment_date))
+            )
+            self.payment_table.setItem(
+                row, 7, QTableWidgetItem(payment.payment_method)
+            )
+            self.payment_table.setItem(
+                row, 8, QTableWidgetItem(payment.reference_number)
+            )
+            self.payment_table.setItem(
+                row, 9, QTableWidgetItem(payment.status)
+            )
+
+        # Maintain table appearance
+        self.payment_table.resizeColumnsToContents()
+        self.payment_table.horizontalHeader().setStretchLastSection(True)
+        self.payment_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+
+        # Set consistent row heights
+        row_height = 40
+        for row in range(self.payment_table.rowCount()):
+            self.payment_table.setRowHeight(row, row_height)
 
 
 if __name__ == "__main__":
