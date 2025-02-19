@@ -60,7 +60,7 @@ class TestSupplier(TestSetup):
         )
 
     def test_create_supplier(self) -> None:
-        """Test case for creating a supplier."""
+        """Creating a supplier."""
         result: Supplier = self.supplier_view.create(
             db_session=self.session,
             record=Supplier(**self.test_supplier_1.model_dump()),
@@ -75,7 +75,7 @@ class TestSupplier(TestSetup):
         )
 
     def test_duplicate_email_validation(self) -> None:
-        """Test case for validating duplicate email."""
+        """Validating duplicate email."""
         # Create first supplier
         self.supplier_view.create(
             db_session=self.session,
@@ -101,7 +101,7 @@ class TestSupplier(TestSetup):
         )
 
     def test_invalid_email_validation(self) -> None:
-        """Test case for validating invalid email format."""
+        """Validating invalid email format."""
         with pytest.raises(ValidationError) as exc_info:
             SupplierBase(
                 name="Test Supplier",
@@ -113,7 +113,7 @@ class TestSupplier(TestSetup):
         assert "value is not a valid email address" in str(exc_info.value)
 
     def test_email_spaces_handling(self) -> None:
-        """Test case for handling spaces in email during creation."""
+        """Handling spaces in email during creation."""
         supplier_with_spaces: SupplierBase = SupplierBase(
             name="Test Supplier",
             email="   test.spaces@example.com   ",
@@ -135,7 +135,7 @@ class TestSupplier(TestSetup):
         )
 
     def test_duplicate_contact_no_validation(self) -> None:
-        """Test case for validating duplicate contact number."""
+        """Validating duplicate contact number."""
         self.supplier_view.create(
             db_session=self.session,
             record=Supplier(**self.test_supplier_1.model_dump()),
@@ -160,7 +160,7 @@ class TestSupplier(TestSetup):
         )
 
     def test_invalid_contact_no_validation(self) -> None:
-        """Test case for validating invalid contact number format."""
+        """Validating invalid contact number format."""
         with pytest.raises(ValidationError) as exc_info:
             SupplierBase(
                 name="Test Supplier",
@@ -183,7 +183,7 @@ class TestSupplier(TestSetup):
         assert "value is not a valid phone number" in str(exc_info.value)
 
     def test_contact_no_spaces_handling(self) -> None:
-        """Test case for handling spaces in contact number during creation."""
+        """Handling spaces in contact number during creation."""
         supplier_with_spaces: SupplierBase = SupplierBase(
             name="Test Supplier",
             email="test@example.com",
@@ -202,7 +202,7 @@ class TestSupplier(TestSetup):
         )
 
     def test_read_supplier_by_id(self) -> None:
-        """Test case for retrieving a supplier by ID."""
+        """Retrieving a supplier by ID."""
         supplier: Supplier = self.supplier_view.create(
             db_session=self.session,
             record=Supplier(**self.test_supplier_1.model_dump()),
@@ -216,7 +216,7 @@ class TestSupplier(TestSetup):
         assert supplier.model_dump() == result.model_dump()
 
     def test_read_non_existent_supplier(self) -> None:
-        """Test case for retrieving a non-existent supplier."""
+        """Retrieving a non-existent supplier."""
         non_existent_id: int = -1
         result: Supplier | None = self.supplier_view.read_by_id(
             db_session=self.session, record_id=non_existent_id
@@ -225,7 +225,7 @@ class TestSupplier(TestSetup):
         assert result is None
 
     def test_read_all_suppliers(self) -> None:
-        """Test case for retrieving all suppliers."""
+        """Retrieving all suppliers."""
         # Create multiple test suppliers
         self.supplier_view.create(
             db_session=self.session,
@@ -257,7 +257,7 @@ class TestSupplier(TestSetup):
         )
 
     def test_read_all_suppliers_pagination(self) -> None:
-        """Test case for supplier pagination with multiple pages."""
+        """Supplier pagination with multiple pages."""
         # Create three test suppliers to test pagination
         supplier_1: Supplier = self.supplier_view.create(
             db_session=self.session,
@@ -307,7 +307,7 @@ class TestSupplier(TestSetup):
         assert all(s.email != supplier_2.email for s in page2_result.records)
 
     def test_update_supplier(self) -> None:
-        """Test case for updating a supplier."""
+        """Updating a supplier."""
         supplier: Supplier = self.supplier_view.create(
             db_session=self.session,
             record=Supplier(**self.test_supplier_1.model_dump()),
@@ -324,7 +324,7 @@ class TestSupplier(TestSetup):
         assert result.model_dump() == supplier.model_dump()
 
     def test_update_non_existent_supplier(self) -> None:
-        """Test case for updating a non-existent supplier."""
+        """Updating a non-existent supplier."""
         non_existent_id: int = -1
         result: Supplier | None = self.supplier_view.update_by_id(
             db_session=self.session,
@@ -335,7 +335,7 @@ class TestSupplier(TestSetup):
         assert result is None
 
     def test_update_duplicate_email_validation(self) -> None:
-        """Test case for validating duplicate email during update."""
+        """Validating duplicate email during update."""
         # Create first supplier
         self.supplier_view.create(
             db_session=self.session,
@@ -368,7 +368,7 @@ class TestSupplier(TestSetup):
         )
 
     def test_update_duplicate_contact_no_validation(self) -> None:
-        """Test case for validating duplicate contact number during update."""
+        """Validating duplicate contact number during update."""
         self.supplier_view.create(
             db_session=self.session,
             record=Supplier(**self.test_supplier_1.model_dump()),
@@ -400,7 +400,7 @@ class TestSupplier(TestSetup):
         )
 
     def test_delete_supplier(self) -> None:
-        """Test case for deleting a supplier."""
+        """Deleting a supplier."""
         supplier: Supplier = self.supplier_view.create(
             db_session=self.session,
             record=Supplier(**self.test_supplier_1.model_dump()),
@@ -421,7 +421,7 @@ class TestSupplier(TestSetup):
         assert retrieved_supplier is None
 
     def test_delete_non_existent_supplier(self) -> None:
-        """Test case for deleting a non-existent supplier."""
+        """Deleting a non-existent supplier."""
         non_existent_id: int = -1
         result: Supplier | None = self.supplier_view.delete_by_id(
             db_session=self.session, record_id=non_existent_id

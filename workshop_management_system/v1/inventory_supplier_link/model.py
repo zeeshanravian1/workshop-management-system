@@ -21,5 +21,9 @@ class InventorySupplierLink(SQLModel, table=True):
 
     """
 
-    inventory_id: int = Field(foreign_key="inventory.id", primary_key=True)
-    supplier_id: int = Field(foreign_key="supplier.id", primary_key=True)
+    inventory_id: int = Field(
+        foreign_key="inventory.id", primary_key=True, ondelete="CASCADE"
+    )
+    supplier_id: int = Field(
+        foreign_key="supplier.id", primary_key=True, ondelete="CASCADE"
+    )

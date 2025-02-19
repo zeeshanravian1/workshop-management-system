@@ -60,7 +60,7 @@ class TestCustomer(TestSetup):
         )
 
     def test_create_customer(self) -> None:
-        """Test case for creating a customer."""
+        """Creating a customer."""
         result: Customer = self.customer_view.create(
             db_session=self.session,
             record=Customer(**self.test_customer_1.model_dump()),
@@ -75,7 +75,7 @@ class TestCustomer(TestSetup):
         )
 
     def test_duplicate_email_validation(self) -> None:
-        """Test case for validating duplicate email."""
+        """Validating duplicate email."""
         # Create first customer
         self.customer_view.create(
             db_session=self.session,
@@ -101,7 +101,7 @@ class TestCustomer(TestSetup):
         )
 
     def test_invalid_email_validation(self) -> None:
-        """Test case for validating invalid email format."""
+        """Validating invalid email format."""
         with pytest.raises(ValidationError) as exc_info:
             CustomerBase(
                 name="Test Customer",
@@ -113,7 +113,7 @@ class TestCustomer(TestSetup):
         assert "value is not a valid email address" in str(exc_info.value)
 
     def test_email_spaces_handling(self) -> None:
-        """Test case for handling spaces in email during creation."""
+        """Handling spaces in email during creation."""
         customer_with_spaces: CustomerBase = CustomerBase(
             name="Test Customer",
             email="   test.spaces@example.com   ",
@@ -135,7 +135,7 @@ class TestCustomer(TestSetup):
         )
 
     def test_duplicate_contact_no_validation(self) -> None:
-        """Test case for validating duplicate contact number."""
+        """Validating duplicate contact number."""
         self.customer_view.create(
             db_session=self.session,
             record=Customer(**self.test_customer_1.model_dump()),
@@ -160,7 +160,7 @@ class TestCustomer(TestSetup):
         )
 
     def test_invalid_contact_no_validation(self) -> None:
-        """Test case for validating invalid contact number format."""
+        """Validating invalid contact number format."""
         with pytest.raises(ValidationError) as exc_info:
             CustomerBase(
                 name="Test Customer",
@@ -183,7 +183,7 @@ class TestCustomer(TestSetup):
         assert "value is not a valid phone number" in str(exc_info.value)
 
     def test_contact_no_spaces_handling(self) -> None:
-        """Test case for handling spaces in contact number during creation."""
+        """Handling spaces in contact number during creation."""
         customer_with_spaces: CustomerBase = CustomerBase(
             name="Test Customer",
             email="test@example.com",
@@ -202,7 +202,7 @@ class TestCustomer(TestSetup):
         )
 
     def test_read_customer_by_id(self) -> None:
-        """Test case for retrieving a customer by ID."""
+        """Retrieving a customer by ID."""
         customer: Customer = self.customer_view.create(
             db_session=self.session,
             record=Customer(**self.test_customer_1.model_dump()),
@@ -216,7 +216,7 @@ class TestCustomer(TestSetup):
         assert customer.model_dump() == result.model_dump()
 
     def test_read_non_existent_customer(self) -> None:
-        """Test case for retrieving a non-existent customer."""
+        """Retrieving a non-existent customer."""
         non_existent_id: int = -1
         result: Customer | None = self.customer_view.read_by_id(
             db_session=self.session, record_id=non_existent_id
@@ -225,7 +225,7 @@ class TestCustomer(TestSetup):
         assert result is None
 
     def test_read_all_customers(self) -> None:
-        """Test case for retrieving all customers."""
+        """Retrieving all customers."""
         # Create multiple test customers
         self.customer_view.create(
             db_session=self.session,
@@ -257,7 +257,7 @@ class TestCustomer(TestSetup):
         )
 
     def test_read_all_customers_pagination(self) -> None:
-        """Test case for customer pagination with multiple pages."""
+        """Customer pagination with multiple pages."""
         # Create three test customers to test pagination
         customer_1: Customer = self.customer_view.create(
             db_session=self.session,
@@ -307,7 +307,7 @@ class TestCustomer(TestSetup):
         assert all(c.email != customer_2.email for c in page2_result.records)
 
     def test_update_customer(self) -> None:
-        """Test case for updating a customer."""
+        """Updating a customer."""
         customer: Customer = self.customer_view.create(
             db_session=self.session,
             record=Customer(**self.test_customer_1.model_dump()),
@@ -324,7 +324,7 @@ class TestCustomer(TestSetup):
         assert result.model_dump() == customer.model_dump()
 
     def test_update_non_existent_customer(self) -> None:
-        """Test case for updating a non-existent customer."""
+        """Updating a non-existent customer."""
         non_existent_id: int = -1
         result: Customer | None = self.customer_view.update_by_id(
             db_session=self.session,
@@ -335,7 +335,7 @@ class TestCustomer(TestSetup):
         assert result is None
 
     def test_update_duplicate_email_validation(self) -> None:
-        """Test case for validating duplicate email during update."""
+        """Validating duplicate email during update."""
         # Create first customer
         self.customer_view.create(
             db_session=self.session,
@@ -368,7 +368,7 @@ class TestCustomer(TestSetup):
         )
 
     def test_update_duplicate_contact_no_validation(self) -> None:
-        """Test case for validating duplicate contact number during update."""
+        """Validating duplicate contact number during update."""
         self.customer_view.create(
             db_session=self.session,
             record=Customer(**self.test_customer_1.model_dump()),
@@ -400,7 +400,7 @@ class TestCustomer(TestSetup):
         )
 
     def test_delete_customer(self) -> None:
-        """Test case for deleting a customer."""
+        """Deleting a customer."""
         customer: Customer = self.customer_view.create(
             db_session=self.session,
             record=Customer(**self.test_customer_1.model_dump()),
@@ -421,7 +421,7 @@ class TestCustomer(TestSetup):
         assert retrieved_customer is None
 
     def test_delete_non_existent_customer(self) -> None:
-        """Test case for deleting a non-existent customer."""
+        """Deleting a non-existent customer."""
         non_existent_id: int = -1
         result: Customer | None = self.customer_view.delete_by_id(
             db_session=self.session, record_id=non_existent_id
