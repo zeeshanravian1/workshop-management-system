@@ -48,7 +48,7 @@ from ..utils.pdf_generator import generate_jobcard_pdf
 class JobCardDialog(QDialog):
     """Dialog for adding/updating a job card."""
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, jobcard=None) -> None:
         """Initialize the JobCard Dialog."""
         super().__init__(parent)
         self.setWindowTitle("Job Card Details")
@@ -69,22 +69,27 @@ class JobCardDialog(QDialog):
         """)
         self.form_layout = QFormLayout(self)
 
+        # Add status input
+        self.status_input = QComboBox(self)
+        self.status_input.addItems(
+            ["Pending", "Completed", "Cancelled"]
+        )
+
         self.vehicle_id_input = QComboBox(self)
         self.load_vehicles()
         self.service_date_input = QLineEdit(self)
         self.service_date_input.setText(
             datetime.now().strftime("%Y-%m-%d")
         )  # Auto-fill current date
-        self.status_input = QLineEdit(self)
-        self.total_amount_input = QLineEdit(self)
         self.description_input = QLineEdit(self)
 
         self.form_layout.addRow("Vehicle ID:", self.vehicle_id_input)
         self.form_layout.addRow(
+            "Status:", self.status_input
+        )  # Add status field to form
+        self.form_layout.addRow(
             "Service Date (YYYY-MM-DD):", self.service_date_input
         )
-        self.form_layout.addRow("Status:", self.status_input)
-        self.form_layout.addRow("Total Amount:", self.total_amount_input)
         self.form_layout.addRow("Description:", self.description_input)
 
         self.buttons = QDialogButtonBox(
@@ -95,6 +100,17 @@ class JobCardDialog(QDialog):
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         self.form_layout.addWidget(self.buttons)
+
+        # If jobcard data is provided, populate the fields
+        if jobcard:
+            # Find and select the correct vehicle in combobox
+            index = self.vehicle_id_input.findData(jobcard.vehicle_id)
+            if index >= 0:
+                self.vehicle_id_input.setCurrentIndex(index)
+
+            self.service_date_input.setText(str(jobcard.service_date))
+            self.description_input.setText(jobcard.description)
+            self.status_input.setCurrentText(jobcard.status)
 
     def load_vehicles(self):
         """Load vehicles from the database and populate the dropdown."""
@@ -116,41 +132,39 @@ class JobCardDialog(QDialog):
             # Get and validate vehicle_id
             vehicle_id = self.vehicle_id_input.currentData()
             if not vehicle_id:
-                raise ValueError("Please select a vehicle")
+                raise ValueError("Vehicle ID cannot be empty")
+
+            # Get and validate status
+            status = self.status_input.currentText()
+            if not status:
+                raise ValueError("Status cannot be empty")
 
             # Get and validate service date
             service_date = self.service_date_input.text().strip()
             if not service_date:
-                raise ValueError("Service date is required")
+                raise ValueError("Service date cannot be empty")
             try:
                 datetime.strptime(service_date, "%Y-%m-%d")
             except ValueError:
                 raise ValueError("Invalid date format. Use YYYY-MM-DD")
 
-            # Get and validate status
-            status = self.status_input.text().strip()
-            if not status:
-                raise ValueError("Status is required")
-
-            # Get and validate total amount
-            total_amount = self.total_amount_input.text().strip()
-            try:
-                total_amount = float(total_amount) if total_amount else 0.0
-            except ValueError:
-                raise ValueError("Total amount must be a valid number")
-
-            # Get description
+            # Get and validate description
             description = self.description_input.text().strip()
+            if not description:
+                raise ValueError("Description cannot be empty")
+            if len(description) < 5:
+                raise ValueError(
+                    "Description must be at least 5 characters long"
+                )
 
             return {
                 "vehicle_id": vehicle_id,
                 "service_date": service_date,
-                "status": status,
-                "total_amount": total_amount,
                 "description": description,
+                "status": status,
             }
         except ValueError as e:
-            QMessageBox.critical(self, "Input Error", str(e))
+            QMessageBox.critical(self, "Validation Error", str(e))
             raise
 
     def accept(self) -> None:
@@ -238,7 +252,7 @@ class JobCardGUI(QWidget):
 
         self.search_criteria = QComboBox()
         self.search_criteria.addItems(
-            ["Vehicle ID", "Service Date", "Status", "Description"]
+            ["Vehicle ID", "Service Date", "Description"]
         )
         self.search_criteria.currentTextChanged.connect(self.search_jobcards)
 
@@ -295,7 +309,7 @@ class JobCardGUI(QWidget):
             QTableWidget.EditTrigger.NoEditTriggers
         )
         self.jobcard_table.setSelectionMode(
-            QTableWidget.SelectionMode.NoSelection
+            QTableWidget.SelectionMode.SingleSelection
         )
         self.jobcard_table.horizontalHeader().setStretchLastSection(True)
         self.jobcard_table.horizontalHeader().setSectionResizeMode(
@@ -350,14 +364,12 @@ class JobCardGUI(QWidget):
             with Session(engine) as session:
                 jobcards = self.jobcard_view.read_all(db_session=session)
                 self.jobcard_table.setRowCount(len(jobcards) + 1)
-                self.jobcard_table.setColumnCount(6)
+                self.jobcard_table.setColumnCount(5)
                 self.jobcard_table.setHorizontalHeaderLabels(
                     [
                         "ID",
                         "Vehicle ID",
                         "Service Date",
-                        "Status",
-                        "Total Amount",
                         "Description",
                     ]
                 )
@@ -367,8 +379,6 @@ class JobCardGUI(QWidget):
                     "ID",
                     "Vehicle ID",
                     "Service Date",
-                    "Status",
-                    "Total Amount",
                     "Description",
                 ]
                 for col, name in enumerate(column_names):
@@ -393,13 +403,7 @@ class JobCardGUI(QWidget):
                         row, 2, QTableWidgetItem(str(jobcard.service_date))
                     )
                     self.jobcard_table.setItem(
-                        row, 3, QTableWidgetItem(jobcard.status)
-                    )
-                    self.jobcard_table.setItem(
-                        row, 4, QTableWidgetItem(str(jobcard.total_amount))
-                    )
-                    self.jobcard_table.setItem(
-                        row, 5, QTableWidgetItem(jobcard.description)
+                        row, 3, QTableWidgetItem(jobcard.description)
                     )
 
                 # Adjust column widths
@@ -427,9 +431,9 @@ class JobCardGUI(QWidget):
                         service_date=datetime.strptime(
                             data["service_date"], "%Y-%m-%d"
                         ),
-                        status=data["status"],
-                        total_amount=data["total_amount"],
                         description=data["description"],
+                        status=data["status"],  # Add status field
+                        total_amount=0.0,  # Add a default value for total_amount
                     )
                     self.jobcard_view.create(
                         db_session=session, record=new_jobcard
@@ -446,49 +450,53 @@ class JobCardGUI(QWidget):
     def update_jobcard(self) -> None:
         """Update an existing job card."""
         selected_row = self.jobcard_table.currentRow()
-        if selected_row == -1:
+        if selected_row <= 0:  # 0 is header row
             QMessageBox.warning(
                 self, "Warning", "Please select a job card to update."
             )
             return
 
-        item = self.jobcard_table.item(selected_row, 0)
-        if item is None:
-            QMessageBox.warning(
-                self, "Warning", "Selected job card ID is invalid."
-            )
-            return
-        jobcard_id = item.text()
+        try:
+            jobcard_id = int(self.jobcard_table.item(selected_row, 0).text())
 
-        dialog = JobCardDialog(self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            data = dialog.get_data()
-            try:
-                with Session(engine) as session:
-                    jobcard_obj = self.jobcard_view.read_by_id(
-                        db_session=session, record_id=int(jobcard_id)
-                    )
-                    if jobcard_obj:
-                        jobcard_obj.vehicle_id = data["vehicle_id"]
-                        jobcard_obj.service_date = datetime.strptime(
-                            data["service_date"], "%Y-%m-%d"
-                        )
-                        jobcard_obj.status = data["status"]
-                        jobcard_obj.total_amount = data["total_amount"]
-                        jobcard_obj.description = data["description"]
-                        self.jobcard_view.update(
-                            db_session=session,
-                            record_id=int(jobcard_id),
-                            record=jobcard_obj,
-                        )
-                        QMessageBox.information(
-                            self, "Success", "Job card updated successfully!"
-                        )
-                        self.load_jobcards()
-            except Exception as e:
-                QMessageBox.critical(
-                    self, "Error", f"Failed to update job card: {e!s}"
+            # Fetch the current job card data
+            with Session(engine) as session:
+                current_jobcard = self.jobcard_view.read_by_id(
+                    db_session=session, record_id=jobcard_id
                 )
+
+                if not current_jobcard:
+                    QMessageBox.warning(self, "Error", "Job card not found.")
+                    return
+
+                # Create dialog with current data
+                dialog = JobCardDialog(self, current_jobcard)
+
+                if dialog.exec() == QDialog.DialogCode.Accepted:
+                    data = dialog.get_data()
+
+                    # Update the job card
+                    current_jobcard.vehicle_id = data["vehicle_id"]
+                    current_jobcard.service_date = datetime.strptime(
+                        data["service_date"], "%Y-%m-%d"
+                    )
+                    current_jobcard.description = data["description"]
+
+                    self.jobcard_view.update(
+                        db_session=session,
+                        record_id=jobcard_id,
+                        record=current_jobcard,
+                    )
+
+                    QMessageBox.information(
+                        self, "Success", "Job card updated successfully!"
+                    )
+                    self.load_jobcards()
+
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Error", f"Failed to update job card: {e!s}"
+            )
 
     def delete_jobcard(self) -> None:
         """Delete a job card from the database."""
@@ -544,10 +552,8 @@ class JobCardGUI(QWidget):
                     cell_text = self.jobcard_table.item(row, 1)
                 elif criteria == "service date":
                     cell_text = self.jobcard_table.item(row, 2)
-                elif criteria == "status":
-                    cell_text = self.jobcard_table.item(row, 3)
                 elif criteria == "description":
-                    cell_text = self.jobcard_table.item(row, 5)
+                    cell_text = self.jobcard_table.item(row, 3)
 
                 if (
                     cell_text
@@ -612,6 +618,85 @@ class JobCardGUI(QWidget):
                 self, "Error", f"Failed to generate PDF: {e!s}"
             )
 
+    def setup_buttons(self):
+        """Setup button connections."""
+        self.update_button.clicked.connect(self.update_job_card_clicked)
+
+    def update_job_card_clicked(self):
+        """Handle the update job card button click."""
+        selected_rows = self.jobcard_table.selectionModel().selectedRows()
+
+        if not selected_rows:
+            QMessageBox.warning(
+                self, "Warning", "Please select a job card to update."
+            )
+            return
+
+        # Get the selected row index
+        row_index = selected_rows[0].row()
+
+        # Get data from the selected row
+        job_card_id = self.jobcard_table.item(row_index, 0).text()
+        customer_id = self.jobcard_table.item(row_index, 1).text()
+        vehicle_id = self.jobcard_table.item(row_index, 2).text()
+        description = self.jobcard_table.item(row_index, 3).text()
+        status = self.jobcard_table.item(row_index, 4).text()
+        date_created = self.jobcard_table.item(row_index, 5).text()
+
+        # Populate input fields with selected data
+        self.customer_id_input.setText(customer_id)
+        self.vehicle_id_input.setText(vehicle_id)
+        self.description_input.setText(description)
+        self.status_input.setCurrentText(status)
+
+        # Store the job card ID for use in the actual update operation
+        self.selected_job_card_id = job_card_id
+
+        # You might want to change the add button text to indicate update mode
+        self.add_button.setText("Update Job Card")
+        self.add_button.clicked.disconnect()
+        self.add_button.clicked.connect(
+            lambda: self.perform_update(job_card_id)
+        )
+
+    def perform_update(self, job_card_id):
+        """Perform the actual update operation."""
+        try:
+            # Get values from input fields
+            customer_id = self.customer_id_input.text()
+            vehicle_id = self.vehicle_id_input.text()
+            description = self.description_input.text()
+            status = self.status_input.currentText()
+
+            # Update the job card in the database
+            with JobCardDB() as db:
+                db.update_job_card(
+                    job_card_id, customer_id, vehicle_id, description, status
+                )
+
+            # Reset the form and refresh the table
+            self.clear_input_fields()
+            self.load_job_cards()
+            self.add_button.setText("Add Job Card")
+            self.add_button.clicked.disconnect()
+            self.add_button.clicked.connect(self.add_job_card)
+
+            QMessageBox.information(
+                self, "Success", "Job card updated successfully!"
+            )
+
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Error", f"Failed to update job card: {e!s}"
+            )
+
+    def clear_input_fields(self):
+        """Clear all input fields."""
+        self.customer_id_input.clear()
+        self.vehicle_id_input.clear()
+        self.description_input.clear()
+        self.status_input.setCurrentIndex(0)
+
 
 def generate_jobcard_pdf(jobcard, inventory_items, filename):
     """Generate PDF for a job card."""
@@ -628,8 +713,6 @@ def generate_jobcard_pdf(jobcard, inventory_items, filename):
     # Job Card Details
     data = [
         ["Vehicle ID:", str(jobcard.vehicle_id)],
-        ["Status:", jobcard.status],
-        ["Total Amount:", f"${jobcard.total_amount:.2f}"],
         ["Description:", jobcard.description],
     ]
 
