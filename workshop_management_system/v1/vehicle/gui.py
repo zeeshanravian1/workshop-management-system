@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 from sqlmodel import Session, select
 
 from workshop_management_system.database.connection import engine
+from workshop_management_system.database.session import get_session
 from workshop_management_system.v1.customer.model import Customer
 from workshop_management_system.v1.vehicle.model import Vehicle
 from workshop_management_system.v1.vehicle.view import VehicleView
@@ -117,8 +118,18 @@ class CustomerComboBox(QComboBox):
         """)
         self.customer_ids = []
         self.blockSignals(True)  # Block signals during initial load
+
+        # Add initial items
+        self.addItem("Select a customer...")  # Index 0
+        self.customer_ids.append(None)
+        self.addItem("Add new customer...")  # Index 1
+        self.customer_ids.append("new")
+
+        # Load existing customers
         self.load_customers()
         self.blockSignals(False)
+
+        # Connect the selection change event
         self.currentIndexChanged.connect(self.check_new_customer)
 
     def load_customers(self) -> None:
@@ -202,21 +213,9 @@ class VehicleGUI(QWidget):
         """Initialize the Vehicle GUI."""
         super().__init__(parent)
         self.parent_widget = parent
-        # Update pagination to match PaginationBase
-        self.pagination = {
-            "current_page": 1,
-            "limit": 15,
-            "total_pages": 0,
-            "total_records": 0,
-            "next_record_id": None,
-            "previous_record_id": None,
-            "records": [],
-        }
-        # Keep original properties for compatibility
-        self.page_size = self.pagination["limit"]
-        self.current_page = self.pagination["current_page"]
-        self.all_vehicles = []
-        self.filtered_vehicles = []
+        self.current_page = 1
+        self.page_size = 15
+        self.vehicle_view = VehicleView(model=Vehicle)
 
         # Update theme to match CustomerGUI
         self.setStyleSheet("""
@@ -252,8 +251,6 @@ class VehicleGUI(QWidget):
                 color: white;
             }
         """)
-
-        self.vehicle_view = VehicleView(model=Vehicle)
 
         # Main layout
         main_layout = QVBoxLayout(self)
@@ -444,7 +441,7 @@ class VehicleGUI(QWidget):
         if self.parent_widget:
             self.parent_widget.back_to_home()
 
-    def update_pagination_buttons(self, total_pages: int) -> None:
+    def _update_pagination_buttons(self, total_pages: int) -> None:
         """Update the pagination buttons."""
         # Clear existing buttons
         while self.page_buttons_layout.count():
@@ -452,7 +449,7 @@ class VehicleGUI(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
-        current_page = self.pagination["current_page"]
+        current_page = self.current_page
 
         # Always show first page
         self.add_page_button(1)
@@ -514,7 +511,7 @@ class VehicleGUI(QWidget):
         button.setMinimumWidth(40)
         button.setMaximumWidth(40)
 
-        if page_num == self.pagination["current_page"]:
+        if page_num == self.current_page:
             button.setStyleSheet("""
                 QPushButton {
                     background-color: skyblue;
@@ -544,64 +541,32 @@ class VehicleGUI(QWidget):
         self.page_buttons_layout.addWidget(button)
 
     def load_vehicles(self, refresh_all=True) -> None:
-        """Load vehicles with pagination."""
+        """Load vehicles using backend pagination."""
         try:
-            with Session(engine) as session:
-                if refresh_all:
-                    self.all_vehicles = self.vehicle_view.read_all(
-                        db_session=session
-                    )
-                    self.filtered_vehicles = self.all_vehicles.copy()
+            search_text = self.search_input.text().lower()
+            search_field = (
+                self.search_criteria.currentText().lower()
+                if search_text
+                else None
+            )
 
-                total_records = len(self.filtered_vehicles)
-                total_pages = (
-                    total_records + self.pagination["limit"] - 1
-                ) // self.pagination["limit"]
-
-                # Update pagination state
-                self.pagination.update(
-                    {
-                        "total_records": total_records,
-                        "total_pages": total_pages,
-                    }
+            with get_session() as session:
+                # Properly using BaseView's read_all method
+                result = self.vehicle_view.read_all(
+                    db_session=session,
+                    page=self.current_page,
+                    limit=self.page_size,
+                    search_by=search_field,
+                    search_query=search_text,
                 )
 
-                # Calculate page data
-                start_idx = (
-                    self.pagination["current_page"] - 1
-                ) * self.pagination["limit"]
-                end_idx = start_idx + self.pagination["limit"]
-                current_page_records = self.filtered_vehicles[
-                    start_idx:end_idx
-                ]
-                self.pagination["records"] = current_page_records
-
-                # Update next/previous record IDs
-                if end_idx < total_records:
-                    self.pagination["next_record_id"] = self.filtered_vehicles[
-                        end_idx
-                    ].id
-                else:
-                    self.pagination["next_record_id"] = None
-
-                if start_idx > 0:
-                    self.pagination["previous_record_id"] = (
-                        self.filtered_vehicles[start_idx - 1].id
-                    )
-                else:
-                    self.pagination["previous_record_id"] = None
-
-                # Update table content
-                self._update_table_data(current_page_records)
-
-                # Update pagination buttons
-                self.update_pagination_buttons(total_pages)
+                # Correct usage of PaginationBase attributes
                 self.prev_button.setEnabled(
-                    self.pagination["previous_record_id"] is not None
+                    result.previous_record_id is not None
                 )
-                self.next_button.setEnabled(
-                    self.pagination["next_record_id"] is not None
-                )
+                self.next_button.setEnabled(result.next_record_id is not None)
+                self._update_table_data(result.records)
+                self._update_pagination_buttons(result.total_pages)
 
         except Exception as e:
             QMessageBox.critical(
@@ -610,26 +575,22 @@ class VehicleGUI(QWidget):
 
     def next_page(self) -> None:
         """Load the next page of vehicles."""
-        if self.pagination["next_record_id"] is not None:
-            self.pagination["current_page"] += 1
-            self.current_page = self.pagination["current_page"]  # Keep in sync
-            self.load_vehicles(refresh_all=False)
+        self.current_page += 1
+        self.load_vehicles(refresh_all=False)
 
     def previous_page(self) -> None:
         """Load the previous page of vehicles."""
-        if self.pagination["previous_record_id"] is not None:
-            self.pagination["current_page"] -= 1
-            self.current_page = self.pagination["current_page"]  # Keep in sync
+        if self.current_page > 1:
+            self.current_page -= 1
             self.load_vehicles(refresh_all=False)
 
     def go_to_page(self, page_number: int) -> None:
         """Navigate to specific page number."""
         if (
             1 <= page_number <= self.pagination["total_pages"]
-            and page_number != self.pagination["current_page"]
+            and page_number != self.current_page
         ):
-            self.pagination["current_page"] = page_number
-            self.current_page = page_number  # Keep in sync
+            self.current_page = page_number
             self.load_vehicles(refresh_all=False)
 
     def create_input_dialog(
@@ -669,31 +630,15 @@ class VehicleGUI(QWidget):
                     QRegularExpression("^[A-Za-z0-9]+$")
                 ),
             ),
-            (
-                "chassis_number",
-                "Chassis Number",
-                QLineEdit,
-                QRegularExpressionValidator(
-                    QRegularExpression("^[A-Za-z0-9]+$")
-                ),
-            ),
-            (
-                "engine_number",
-                "Engine Number",
-                QLineEdit,
-                QRegularExpressionValidator(
-                    QRegularExpression("^[A-Za-z0-9]+$")
-                ),
-            ),
-            ("customer", "Customer", CustomerComboBox),
-        ]
+        ]  # Remove customer from fields list since we'll add it separately
 
+        # Add regular input fields
         for field in fields:
             field_name, label = field[0], field[1]
             widget_class = field[2]
 
             input_field = widget_class(dialog)
-            if len(field) > 3 and field_name != "customer":
+            if len(field) > 3:
                 input_field.setValidator(field[3])
 
             if vehicle and field_name != "customer":
@@ -701,6 +646,15 @@ class VehicleGUI(QWidget):
 
             inputs[field_name] = input_field
             layout.addRow(f"{label}:", input_field)
+
+        # Add customer selection
+        customer_combo = CustomerComboBox(dialog)
+        if vehicle and vehicle.customer_id:
+            customer_combo.set_customer_by_id(vehicle.customer_id)
+        else:
+            customer_combo.setCurrentIndex(0)
+        inputs["customer"] = customer_combo
+        layout.addRow("Customer:", customer_combo)
 
         # Add validation to dialog accept
         def validate_and_accept():
@@ -730,20 +684,6 @@ class VehicleGUI(QWidget):
             if not inputs["vehicle_number"].text().strip():
                 QMessageBox.warning(
                     dialog, "Error", "Vehicle Number is required!"
-                )
-                return
-
-            # Validate Chassis Number
-            if not inputs["chassis_number"].text().strip():
-                QMessageBox.warning(
-                    dialog, "Error", "Chassis Number is required!"
-                )
-                return
-
-            # Validate Engine Number
-            if not inputs["engine_number"].text().strip():
-                QMessageBox.warning(
-                    dialog, "Error", "Engine Number is required!"
                 )
                 return
 
@@ -792,34 +732,20 @@ class VehicleGUI(QWidget):
         return None
 
     def add_vehicle(self) -> None:
-        """Add a new vehicle to the database."""
+        """Add vehicle using BaseView."""
         try:
             dialog, inputs = self.create_input_dialog("Add Vehicle")
             if dialog.exec() == QDialog.DialogCode.Accepted:
-                customer_id = inputs["customer"].get_selected_customer_id()
-                if customer_id == "new":
-                    customer_id = self.add_new_customer()
-                    if not customer_id:
-                        return
-                    inputs["customer"].load_customers()
-                    inputs["customer"].setCurrentIndex(
-                        inputs["customer"].customer_ids.index(customer_id)
-                    )
-                elif not customer_id:
-                    QMessageBox.critical(
-                        self, "Error", "Please select a customer."
-                    )
-                    return
-
-                with Session(engine) as session:
+                with get_session() as session:
+                    # Create vehicle with only VehicleBase fields
                     new_vehicle = Vehicle(
                         make=inputs["make"].text(),
                         model=inputs["model"].text(),
                         year=int(inputs["year"].text()),
-                        chassis_number=inputs["chassis_number"].text(),
                         vehicle_number=inputs["vehicle_number"].text(),
-                        engine_number=inputs["engine_number"].text(),
-                        customer_id=customer_id,
+                        customer_id=inputs[
+                            "customer"
+                        ].get_selected_customer_id(),
                     )
                     self.vehicle_view.create(
                         db_session=session, record=new_vehicle
@@ -827,72 +753,55 @@ class VehicleGUI(QWidget):
                     QMessageBox.information(
                         self, "Success", "Vehicle added successfully!"
                     )
-                    self.load_vehicles()
-
+                    self.load_vehicles(refresh_all=True)
         except Exception as e:
             QMessageBox.critical(
                 self, "Error", f"Failed to add vehicle: {e!s}"
             )
 
     def update_vehicle(self) -> None:
-        """Update an existing vehicle."""
+        """Update vehicle using BaseView."""
         try:
             selected_row = self.vehicle_table.currentRow()
-            if selected_row == -1:
+            if selected_row <= 0:
                 QMessageBox.warning(
                     self, "Warning", "Please select a vehicle to update."
                 )
                 return
 
-            item = self.vehicle_table.item(selected_row, 0)
-            if item is None:
-                QMessageBox.warning(
-                    self, "Warning", "Selected vehicle ID is invalid."
-                )
-                return
-            vehicle_id = int(item.text())
+            vehicle_id = int(self.vehicle_table.item(selected_row, 0).text())
 
-            with Session(engine) as session:
-                vehicle_obj = self.vehicle_view.read_by_id(
+            with get_session() as session:
+                # Use BaseView's read_by_id method
+                vehicle = self.vehicle_view.read_by_id(
                     db_session=session, record_id=vehicle_id
                 )
-                if not vehicle_obj:
+                if not vehicle:
                     QMessageBox.warning(self, "Error", "Vehicle not found.")
                     return
 
                 dialog, inputs = self.create_input_dialog(
-                    "Update Vehicle", vehicle_obj
+                    "Update Vehicle", vehicle
                 )
-
                 if dialog.exec() == QDialog.DialogCode.Accepted:
                     customer_id = inputs["customer"].get_selected_customer_id()
-                    if not customer_id:
-                        QMessageBox.critical(
-                            self, "Error", "Please select a customer."
-                        )
-                        return
-
-                    vehicle_obj.make = inputs["make"].text()
-                    vehicle_obj.model = inputs["model"].text()
-                    vehicle_obj.year = int(inputs["year"].text())
-                    vehicle_obj.chassis_number = inputs[
-                        "chassis_number"
-                    ].text()
-                    vehicle_obj.vehicle_number = inputs[
-                        "vehicle_number"
-                    ].text()
-                    vehicle_obj.engine_number = inputs["engine_number"].text()
-                    vehicle_obj.customer_id = customer_id
-
-                    self.vehicle_view.update(
+                    updated_vehicle = Vehicle(
+                        make=inputs["make"].text(),
+                        model=inputs["model"].text(),
+                        year=int(inputs["year"].text()),
+                        vehicle_number=inputs["vehicle_number"].text(),
+                        customer_id=customer_id,
+                    )
+                    # Use BaseView's update_by_id method
+                    self.vehicle_view.update_by_id(
                         db_session=session,
                         record_id=vehicle_id,
-                        record=vehicle_obj,
+                        record=updated_vehicle,
                     )
                     QMessageBox.information(
                         self, "Success", "Vehicle updated successfully!"
                     )
-                    self.load_vehicles()
+                    self.load_vehicles(refresh_all=True)
 
         except Exception as e:
             QMessageBox.critical(
@@ -900,39 +809,36 @@ class VehicleGUI(QWidget):
             )
 
     def delete_vehicle(self) -> None:
-        """Delete a vehicle from the database."""
+        """Delete vehicle using BaseView."""
         try:
             selected_row = self.vehicle_table.currentRow()
-            if selected_row == -1:
-                QMessageBox.warning(
-                    self, "Warning", "Please select a vehicle to delete."
-                )
+            if selected_row <= 0:
                 return
 
-            item = self.vehicle_table.item(selected_row, 0)
-            if item is None:
-                QMessageBox.warning(
-                    self, "Warning", "Selected vehicle ID is invalid."
-                )
-                return
-            vehicle_id = item.text()
+            vehicle_id = int(self.vehicle_table.item(selected_row, 0).text())
 
-            confirmation = QMessageBox.question(
+            confirm = QMessageBox.question(
                 self,
-                "Delete Vehicle",
+                "Confirm Delete",
                 "Are you sure you want to delete this vehicle?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
 
-            if confirmation == QMessageBox.StandardButton.Yes:
-                with Session(engine) as session:
-                    self.vehicle_view.delete(
-                        db_session=session, record_id=int(vehicle_id)
-                    )
-                    QMessageBox.information(
-                        self, "Success", "Vehicle deleted successfully!"
-                    )
-                    self.load_vehicles()
+            if confirm == QMessageBox.StandardButton.Yes:
+                with get_session() as session:
+                    # Use BaseView's delete_by_id method
+                    if self.vehicle_view.delete_by_id(
+                        db_session=session, record_id=vehicle_id
+                    ):
+                        QMessageBox.information(
+                            self, "Success", "Vehicle deleted successfully!"
+                        )
+                        self.load_vehicles()
+                    else:
+                        QMessageBox.warning(
+                            self, "Warning", "Vehicle not found!"
+                        )
+
         except Exception as e:
             QMessageBox.critical(
                 self, "Error", f"Failed to delete vehicle: {e!s}"
@@ -945,43 +851,9 @@ class VehicleGUI(QWidget):
 
     def search_vehicles(self) -> None:
         """Filter vehicles based on search criteria."""
-        search_text = self.search_input.text().lower()
-        criteria = self.search_criteria.currentText().lower()
-
-        # Filter all vehicles
-        self.filtered_vehicles = self.all_vehicles.copy()
-        if search_text:
-            self.filtered_vehicles = [
-                vehicle
-                for vehicle in self.all_vehicles
-                if (
-                    (
-                        criteria == "make"
-                        and search_text in vehicle.make.lower()
-                    )
-                    or (
-                        criteria == "model"
-                        and search_text in vehicle.model.lower()
-                    )
-                    or (
-                        criteria == "vehicle number"
-                        and search_text in vehicle.vehicle_number.lower()
-                    )
-                    or (
-                        criteria == "customer name"
-                        and self.get_customer_name(vehicle)
-                        .lower()
-                        .find(search_text)
-                        != -1
-                    )
-                )
-            ]
-
-        # Reset pagination and reload
-        self.pagination["current_page"] = 1
-        self.current_page = 1  # Keep in sync
-        self.pagination["total_records"] = len(self.filtered_vehicles)
-        self.load_vehicles(refresh_all=False)
+        # Remove local filtering as it's handled by BaseView
+        self.current_page = 1
+        self.load_vehicles(refresh_all=True)
 
     def get_customer_name(self, vehicle) -> str:
         """Get customer name for a vehicle."""
@@ -995,21 +867,13 @@ class VehicleGUI(QWidget):
             return ""
 
     def _update_table_data(self, records):
-        """Update table data while preserving table properties."""
-        self.vehicle_table.setRowCount(len(records) + 1)  # +1 for header
-        self.vehicle_table.setColumnCount(8)
+        """Update table data to match VehicleBase model fields."""
+        self.vehicle_table.setRowCount(len(records) + 1)
+        self.vehicle_table.setColumnCount(6)
 
+        # Headers match VehicleBase fields
+        headers = ["ID", "Make", "Model", "Year", "Vehicle Number", "Customer"]
         # Set headers
-        headers = [
-            "ID",
-            "Make",
-            "Model",
-            "Year",
-            "Vehicle Number",
-            "Chassis Number",
-            "Engine Number",
-            "Customer Name",
-        ]
         for col, header in enumerate(headers):
             item = QTableWidgetItem(header)
             item.setFlags(Qt.ItemFlag.ItemIsEnabled)
@@ -1018,7 +882,7 @@ class VehicleGUI(QWidget):
             item.setFont(font)
             self.vehicle_table.setItem(0, col, item)
 
-        # Populate data
+        # Populate data matching VehicleBase fields
         for row, vehicle in enumerate(records, start=1):
             with Session(engine) as session:
                 customer = session.exec(
@@ -1037,13 +901,7 @@ class VehicleGUI(QWidget):
             self.vehicle_table.setItem(
                 row, 4, QTableWidgetItem(vehicle.vehicle_number)
             )
-            self.vehicle_table.setItem(
-                row, 5, QTableWidgetItem(vehicle.chassis_number)
-            )
-            self.vehicle_table.setItem(
-                row, 6, QTableWidgetItem(vehicle.engine_number)
-            )
-            self.vehicle_table.setItem(row, 7, QTableWidgetItem(customer_name))
+            self.vehicle_table.setItem(row, 5, QTableWidgetItem(customer_name))
 
         # Maintain table appearance
         self.vehicle_table.resizeColumnsToContents()

@@ -10,9 +10,9 @@ from .model import Vehicle
 
 
 class VehicleView(BaseView[Vehicle]):
-    """Vehichle View Class.
+    """Vehicle View Class.
 
     Description:
-    - This class provides CRUD interface for Vehicle model.
+    - This class provides CRUD interface for vehicle model.
 
     """
