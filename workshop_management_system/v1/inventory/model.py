@@ -5,14 +5,22 @@ Description:
 
 """
 
+from typing import TYPE_CHECKING
+
 from sqlmodel import Field, Relationship, SQLModel
 
 from workshop_management_system.core.config import InventoryCategory
 from workshop_management_system.database.connection import Base
+from workshop_management_system.v1.inventory_jobcard_link.model import (
+    InventoryJobCardLink,
+)
 from workshop_management_system.v1.inventory_supplier_link.model import (
     InventorySupplierLink,
 )
 from workshop_management_system.v1.supplier.model import Supplier
+
+if TYPE_CHECKING:
+    from workshop_management_system.v1.jobcard.model import JobCard
 
 
 class InventoryBase(SQLModel):
@@ -34,7 +42,7 @@ class InventoryBase(SQLModel):
     quantity: int = Field(gt=0)
     unit_price: float = Field(gt=0)
     minimum_threshold: int = Field(gt=0)
-    category: InventoryCategory
+    category: InventoryCategory = Field(default=InventoryCategory.OTHERS)
 
 
 class Inventory(Base, InventoryBase, table=True):
@@ -57,4 +65,7 @@ class Inventory(Base, InventoryBase, table=True):
 
     suppliers: list[Supplier] = Relationship(
         back_populates="inventories", link_model=InventorySupplierLink
+    )
+    jobcards: list["JobCard"] = Relationship(
+        back_populates="inventories", link_model=InventoryJobCardLink
     )

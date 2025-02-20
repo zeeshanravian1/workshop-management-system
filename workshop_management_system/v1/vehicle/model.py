@@ -52,3 +52,6 @@ class Vehicle(Base, VehicleBase, table=True):
     """
 
     customer: Customer = Relationship(back_populates="vehicles")
+    job_cards: list["JobCard"] = Relationship(  # type: ignore # noqa: F821
+        back_populates="vehicle", cascade_delete=True
+    )

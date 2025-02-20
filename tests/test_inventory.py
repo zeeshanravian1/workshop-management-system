@@ -548,7 +548,7 @@ class TestInventory(TestSetup):
     def test_update_inventory_supplier_non_existent_previous_supplier(
         self,
     ) -> None:
-        """Updating with non-existent previous supplier."""
+        """Updating an inventory with non-existent previous supplier."""
         # Create inventory item with initial supplier
         inventory: Inventory = self.inventory_view.create(
             db_session=self.session,
@@ -571,8 +571,7 @@ class TestInventory(TestSetup):
 
         # Verify original supplier relationship remains unchanged
         db_record: Inventory | None = self.inventory_view.read_by_id(
-            db_session=self.session,
-            record_id=inventory.id,
+            db_session=self.session, record_id=inventory.id
         )
         assert db_record is not None
         assert len(db_record.suppliers) == 1
@@ -602,8 +601,7 @@ class TestInventory(TestSetup):
 
         # Verify original supplier relationship remains unchanged
         db_record: Inventory | None = self.inventory_view.read_by_id(
-            db_session=self.session,
-            record_id=inventory.id,
+            db_session=self.session, record_id=inventory.id
         )
         assert db_record is not None
         assert len(db_record.suppliers) == 1
@@ -632,8 +630,7 @@ class TestInventory(TestSetup):
 
         # Verify original supplier relationship remains unchanged
         db_record: Inventory | None = self.inventory_view.read_by_id(
-            db_session=self.session,
-            record_id=inventory.id,
+            db_session=self.session, record_id=inventory.id
         )
         assert db_record is not None
         assert len(db_record.suppliers) == 1
@@ -659,8 +656,7 @@ class TestInventory(TestSetup):
 
         # Verify inventory no longer exists
         retrieved_inventory: Inventory | None = self.inventory_view.read_by_id(
-            db_session=self.session,
-            record_id=inventory.id,
+            db_session=self.session, record_id=inventory.id
         )
 
         assert retrieved_inventory is None
@@ -693,8 +689,7 @@ class TestInventory(TestSetup):
 
         # Verify inventory no longer exists
         retrieved_inventory: Inventory | None = self.inventory_view.read_by_id(
-            db_session=self.session,
-            record_id=inventory.id,
+            db_session=self.session, record_id=inventory.id
         )
 
         assert retrieved_inventory is None
@@ -751,8 +746,7 @@ class TestInventory(TestSetup):
         # Verify first inventory no longer exists
         retrieved_inventory_1: Inventory | None = (
             self.inventory_view.read_by_id(
-                db_session=self.session,
-                record_id=inventory_1.id,
+                db_session=self.session, record_id=inventory_1.id
             )
         )
 
@@ -761,8 +755,7 @@ class TestInventory(TestSetup):
         # Verify second inventory still exists
         retrieved_inventory_2: Inventory | None = (
             self.inventory_view.read_by_id(
-                db_session=self.session,
-                record_id=inventory_2.id,
+                db_session=self.session, record_id=inventory_2.id
             )
         )
 
@@ -788,8 +781,7 @@ class TestInventory(TestSetup):
         # Verify second inventory no longer exists
         retrieved_inventory2: Inventory | None = (
             self.inventory_view.read_by_id(
-                db_session=self.session,
-                record_id=inventory_2.id,
+                db_session=self.session, record_id=inventory_2.id
             )
         )
 

@@ -37,7 +37,7 @@ ruff = "^0.9.6"
 skjold = "^0.6.2"
 bandit = "^1.8.3"
 coverage = "^7.6.12"
-logfire = "^3.6.0"
+logfire = "^3.6.1"
 gitlint = "^0.19.1"
 
 [build-system]

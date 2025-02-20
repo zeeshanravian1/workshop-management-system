@@ -1724,14 +1724,14 @@ files = [
 
 [[package]]
 name = "logfire"
-version = "3.6.0"
+version = "3.6.1"
 description = "The best Python observability tool! 🪵🔥"
 optional = false
 python-versions = ">=3.8"
 groups = ["dev"]
 files = [
-    {file = "logfire-3.6.0-py3-none-any.whl", hash = "sha256:9d215ede261cb579d4bad77ff3419ee17145a2a87a9864e1fda21f3143fa2307"},
-    {file = "logfire-3.6.0.tar.gz", hash = "sha256:065a12dc727c92450bb05c0bf17b6ca36d1ee1ba99b6ca53d0f88d877ac863d9"},
+    {file = "logfire-3.6.1-py3-none-any.whl", hash = "sha256:de8d7d9e21b292b0fb5cc653a2d6b93be33828ba9e5b2645d09135a7ffbdbf1e"},
+    {file = "logfire-3.6.1.tar.gz", hash = "sha256:93b11d94ad1a19a8bfc1fd97b40ecc3c919a3edc6a5e51cb2a153e64cd04aa9e"},
 ]
 
 [package.dependencies]
@@ -4579,4 +4579,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<3.14"
-content-hash = "5c0eca34402640b1df4d5fe458e3b35bba58cebc49669b131fdc1a9f000507c5"
+content-hash = "bfca5ed385ad124486f1802e3a0e1dc65aa9e9aef5d04f5a18a3a0796f2c4cef"
