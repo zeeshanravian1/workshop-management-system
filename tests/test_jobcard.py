@@ -220,7 +220,7 @@ class TestJobCard(TestSetup):
                 vehicle_id=self.test_vehicle_1.id,
             )
 
-        assert "Service date cannot be in the past" in str(exc_info.value)
+        assert "Date cannot be in the past." in str(exc_info.value)
 
     def test_create_jobcard(self) -> None:
         """Creating a job card."""

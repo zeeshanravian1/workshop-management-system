@@ -5,8 +5,6 @@ Description:
 
 """
 
-from typing import TYPE_CHECKING
-
 from sqlmodel import Field, Relationship, SQLModel
 
 from workshop_management_system.core.config import InventoryCategory
@@ -14,13 +12,13 @@ from workshop_management_system.database.connection import Base
 from workshop_management_system.v1.inventory_jobcard_link.model import (
     InventoryJobCardLink,
 )
+from workshop_management_system.v1.inventory_service_link.model import (
+    InventoryServiceLink,
+)
 from workshop_management_system.v1.inventory_supplier_link.model import (
     InventorySupplierLink,
 )
 from workshop_management_system.v1.supplier.model import Supplier
-
-if TYPE_CHECKING:
-    from workshop_management_system.v1.jobcard.model import JobCard
 
 
 class InventoryBase(SQLModel):
@@ -66,6 +64,9 @@ class Inventory(Base, InventoryBase, table=True):
     suppliers: list[Supplier] = Relationship(
         back_populates="inventories", link_model=InventorySupplierLink
     )
-    jobcards: list["JobCard"] = Relationship(
+    jobcards: list["JobCard"] = Relationship(  # type: ignore # noqa: F821
         back_populates="inventories", link_model=InventoryJobCardLink
+    )
+    services: list["Service"] = Relationship(  # type: ignore # noqa: F821
+        back_populates="inventories", link_model=InventoryServiceLink
     )

@@ -104,20 +104,20 @@ class ServiceStatus(str, Enum):
         return ", ".join([key.value for key in cls])
 
 
-def service_date_validator(service_date: date) -> date:
-    """Service Date Validator.
+def date_validator(service_date: date) -> date:
+    """Date Validator.
 
     Description:
-    - This function is used to validate service date.
+    - This function is used to validate date.
 
     :Args:
-    - `v (date)`: Service date.
+    - `service_date (date)`: Service Date.
 
     :Returns:
-    - `date`: Service date.
+    - `service_date (date)`: Service Date.
 
     """
     if service_date < date.today():
-        raise ValueError("Service date cannot be in the past")
+        raise ValueError("Date cannot be in the past.")
 
     return service_date

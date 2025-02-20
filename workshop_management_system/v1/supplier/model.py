@@ -5,8 +5,6 @@ Description:
 
 """
 
-from typing import TYPE_CHECKING
-
 from pydantic import EmailStr
 from pydantic_extra_types.phone_numbers import PhoneNumber
 from sqlmodel import Field, Relationship, SQLModel
@@ -15,9 +13,6 @@ from workshop_management_system.database.connection import Base
 from workshop_management_system.v1.inventory_supplier_link.model import (
     InventorySupplierLink,
 )
-
-if TYPE_CHECKING:
-    from workshop_management_system.v1.inventory.model import Inventory
 
 
 class SupplierBase(SQLModel):
@@ -59,6 +54,6 @@ class Supplier(Base, SupplierBase, table=True):
 
     """
 
-    inventories: list["Inventory"] = Relationship(
+    inventories: list["Inventory"] = Relationship(  # type: ignore # noqa: F821
         back_populates="suppliers", link_model=InventorySupplierLink
     )
