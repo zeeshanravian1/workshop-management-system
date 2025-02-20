@@ -70,7 +70,7 @@ class VehicleGUI(BaseGUI):
             QMessageBox.information(
                 self, "Update", "Update vehicle functionality"
             )
-
+# This
     def delete_vehicle(self) -> None:
         """Delete the selected vehicle."""
         selected_row = self.customer_table.currentRow()
