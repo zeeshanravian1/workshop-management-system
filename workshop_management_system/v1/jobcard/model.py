@@ -4,7 +4,7 @@ Description:
 - This module contains model for jobcard table.
 """
 
-from datetime import date
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlmodel import Field, Relationship
@@ -21,7 +21,7 @@ class JobCard(Base, table=True):
     """Job Card Table."""
 
     vehicle_id: int = Field(foreign_key="vehicle.id")
-    service_date: date
+    service_date: datetime
     status: str = Field(max_length=50)
     total_amount: float = Field(max_digits=10, decimal_places=2)
     description: str = Field(max_length=300)

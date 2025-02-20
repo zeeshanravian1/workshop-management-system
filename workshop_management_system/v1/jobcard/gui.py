@@ -9,7 +9,7 @@ import webbrowser  # Add this import
 from datetime import datetime
 
 from PyQt6.QtCore import QDate, Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QIntValidator  # Add QIntValidator here
 from PyQt6.QtWidgets import (
     QApplication,
     QCalendarWidget,
@@ -39,11 +39,211 @@ from workshop_management_system.database.connection import engine
 from workshop_management_system.v1.inventory.association import (
     InventoryEstimate,
 )
+from workshop_management_system.v1.inventory.model import Inventory
 from workshop_management_system.v1.jobcard.model import JobCard
 from workshop_management_system.v1.jobcard.view import JobCardView
 from workshop_management_system.v1.vehicle.model import Vehicle
 
 from ..utils.pdf_generator import generate_jobcard_pdf
+
+
+class InventoryItemsDialog(QDialog):
+    """Dialog for selecting inventory items."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Select Inventory Items")
+        self.setMinimumWidth(600)
+        self.selected_items = []
+
+        # Initialize tracking dictionaries first
+        self.selected_checkboxes = {}
+        self.current_quantities = {}
+
+        layout = QVBoxLayout(self)
+
+        # Create inventory items table
+        self.table = QTableWidget()
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(
+            [
+                "Select",
+                "Item Name",
+                "Available Quantity",
+                "Unit Price",
+                "Quantity to Use",
+            ]
+        )
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.table)
+
+        # Add a status label for showing quantity info
+        self.status_label = QLabel()
+        self.status_label.setStyleSheet("""
+            QLabel {
+                color: #333;
+                padding: 10px;
+                background-color: #f8f8f8;
+                border-radius: 5px;
+                border: 1px solid #ddd;
+                font-size: 12px;
+                min-height: 100px;
+            }
+        """)
+        layout.addWidget(self.status_label)
+
+        # Buttons
+        button_layout = QHBoxLayout()
+        ok_button = QPushButton("OK")
+        ok_button.clicked.connect(self.accept)
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(ok_button)
+        button_layout.addWidget(cancel_button)
+        layout.addLayout(button_layout)
+
+        self.load_inventory_items()
+
+    def load_inventory_items(self) -> None:
+        """Load inventory items into the table."""
+        try:
+            with Session(engine) as session:
+                items = session.exec(select(Inventory)).all()
+                self.table.setRowCount(len(items))
+
+                for row, item in enumerate(items):
+                    # Checkbox
+                    checkbox = QTableWidgetItem()
+                    checkbox.setFlags(
+                        Qt.ItemFlag.ItemIsUserCheckable
+                        | Qt.ItemFlag.ItemIsEnabled
+                    )
+                    checkbox.setCheckState(Qt.CheckState.Unchecked)
+                    self.table.setItem(row, 0, checkbox)
+
+                    # Store item name for checkbox tracking
+                    self.selected_checkboxes[row] = item.item_name
+
+                    # Item details
+                    self.table.setItem(
+                        row, 1, QTableWidgetItem(item.item_name)
+                    )
+                    self.table.setItem(
+                        row, 2, QTableWidgetItem(str(item.quantity))
+                    )
+                    self.table.setItem(
+                        row, 3, QTableWidgetItem(f"${item.unit_price:.2f}")
+                    )
+
+                    # Quantity input
+                    quantity_input = QLineEdit()
+                    quantity_input.setValidator(QIntValidator(0, 999999))
+                    quantity_input.textChanged.connect(
+                        lambda text,
+                        r=row,
+                        name=item.item_name: self.update_selection(
+                            r, text, name
+                        )
+                    )
+                    self.table.setCellWidget(row, 4, quantity_input)
+
+                # Connect checkbox state change
+                self.table.itemChanged.connect(self.on_checkbox_changed)
+
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Error", f"Failed to load inventory items: {e}"
+            )
+
+    def on_checkbox_changed(self, item):
+        """Handle checkbox state changes."""
+        if item.column() == 0:  # Checkbox column
+            row = item.row()
+            item_name = self.selected_checkboxes.get(row)
+            if item_name:
+                if item.checkState() == Qt.CheckState.Checked:
+                    # Initialize quantity if checked
+                    quantity_widget = self.table.cellWidget(row, 4)
+                    if quantity_widget and quantity_widget.text():
+                        self.current_quantities[item_name] = int(
+                            quantity_widget.text()
+                        )
+                    else:
+                        self.current_quantities[item_name] = 0
+                else:
+                    # Remove quantity if unchecked
+                    self.current_quantities.pop(item_name, None)
+                self.update_status_label()
+
+    def update_selection(self, row: int, text: str, item_name: str) -> None:
+        """Update both quantity and selection status."""
+        try:
+            checkbox = self.table.item(row, 0)
+            if not checkbox:
+                return
+
+            if text and int(text) > 0:
+                # Auto-check checkbox if quantity is entered
+                checkbox.setCheckState(Qt.CheckState.Checked)
+                self.current_quantities[item_name] = int(text)
+            else:
+                # Auto-uncheck if quantity is 0 or empty
+                checkbox.setCheckState(Qt.CheckState.Unchecked)
+                self.current_quantities.pop(item_name, None)
+
+            self.update_status_label()
+
+        except ValueError:
+            self.current_quantities.pop(item_name, None)
+            self.update_status_label()
+
+    def update_status_label(self):
+        """Update status label with all selected items."""
+        status_text = "Selected Items:\n\n"
+        total_items = 0
+        total_amount = 0
+
+        for row in range(self.table.rowCount()):
+            checkbox = self.table.item(row, 0)
+            if checkbox and checkbox.checkState() == Qt.CheckState.Checked:
+                item_name = self.table.item(row, 1).text()
+                quantity = self.current_quantities.get(item_name, 0)
+                if quantity > 0:
+                    unit_price = float(
+                        self.table.item(row, 3).text().replace("$", "")
+                    )
+                    item_total = quantity * unit_price
+                    status_text += f"• {item_name}: {quantity} units (${item_total:.2f})\n"
+                    total_items += quantity
+                    total_amount += item_total
+
+        status_text += f"\nTotal Items: {total_items}"
+        status_text += f"\nTotal Amount: ${total_amount:.2f}"
+        self.status_label.setText(status_text)
+
+    def get_selected_items(self):
+        """Get the selected inventory items and their quantities."""
+        selected = []
+        for row in range(self.table.rowCount()):
+            checkbox = self.table.item(row, 0)
+            if checkbox and checkbox.checkState() == Qt.CheckState.Checked:
+                quantity_widget = self.table.cellWidget(row, 4)
+                if quantity_widget and quantity_widget.text():
+                    quantity = int(quantity_widget.text())
+                    if quantity > 0:  # Only include items with quantity > 0
+                        selected.append(
+                            {
+                                "item_name": self.table.item(row, 1).text(),
+                                "quantity": quantity,
+                                "unit_price": float(
+                                    self.table.item(row, 3)
+                                    .text()
+                                    .replace("$", "")
+                                ),
+                            }
+                        )
+        return selected
 
 
 class JobCardDialog(QDialog):
@@ -105,6 +305,21 @@ class JobCardDialog(QDialog):
             "Status:", self.status_input
         )  # Add status field to form
         self.form_layout.addRow("Description:", self.description_input)
+
+        # Add inventory items section
+        self.inventory_items_table = QTableWidget()
+        self.inventory_items_table.setColumnCount(3)
+        self.inventory_items_table.setHorizontalHeaderLabels(
+            ["Item Name", "Quantity", "Unit Price"]
+        )
+        self.form_layout.addRow(self.inventory_items_table)
+
+        # Add button to select inventory items
+        select_items_button = QPushButton("Select Inventory Items")
+        select_items_button.clicked.connect(self.select_inventory_items)
+        self.form_layout.addRow(select_items_button)
+
+        self.selected_items = []
 
         self.buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
@@ -207,10 +422,33 @@ class JobCardDialog(QDialog):
                 "service_date": service_date,
                 "description": description,
                 "status": status,
+                "inventory_items": self.selected_items,  # Add inventory items
             }
         except ValueError as e:
             QMessageBox.critical(self, "Validation Error", str(e))
             raise
+
+    def select_inventory_items(self):
+        """Open dialog to select inventory items."""
+        dialog = InventoryItemsDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.selected_items = dialog.get_selected_items()
+            self.update_inventory_items_table()
+
+    def update_inventory_items_table(self):
+        """Update the inventory items table with selected items."""
+        self.inventory_items_table.setRowCount(len(self.selected_items))
+
+        for row, item in enumerate(self.selected_items):
+            self.inventory_items_table.setItem(
+                row, 0, QTableWidgetItem(item["item_name"])
+            )
+            self.inventory_items_table.setItem(
+                row, 1, QTableWidgetItem(str(item["quantity"]))
+            )
+            self.inventory_items_table.setItem(
+                row, 2, QTableWidgetItem(f"${item['unit_price']:.2f}")
+            )
 
     def accept(self) -> None:
         """Override accept to add validation."""

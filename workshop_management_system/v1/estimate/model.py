@@ -1,6 +1,6 @@
 """Estimate Model Module."""
 
-from datetime import datetime
+from datetime import date
 from typing import TYPE_CHECKING, Optional
 
 from sqlmodel import Field, Relationship
@@ -20,10 +20,10 @@ if TYPE_CHECKING:
 class Estimate(Base, table=True):
     """Estimate Table."""
 
-    estimate_date: datetime = Field()
+    estimate_date: date = Field()
     total_estimate_amount: float = Field(default=0.0)
     status: str = Field(max_length=50)
-    valid_until: datetime
+    valid_until: date
     description: str | None = Field(max_length=255, default=None)
     vehicle_id: int = Field(foreign_key="vehicle.id")
     job_card_id: int | None = Field(foreign_key="jobcard.id", default=None)
