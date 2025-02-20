@@ -455,6 +455,75 @@ class TestJobCard(TestSetup):
             for j in page2_result.records
         )
 
+    def test_search_jobcard_by_description(self) -> None:
+        """Searching job cards by description."""
+        # Create test job cards
+        self.jobcard_view.create(
+            db_session=self.session,
+            record=JobCard(
+                **self.test_jobcard_1.model_dump(),
+                inventories=[self.test_inventory_1],
+            ),
+        )
+        self.jobcard_view.create(
+            db_session=self.session,
+            record=JobCard(
+                **self.test_jobcard_2.model_dump(),
+                inventories=[self.test_inventory_2],
+            ),
+        )
+        self.jobcard_view.create(
+            db_session=self.session,
+            record=JobCard(
+                **self.test_jobcard_3.model_dump(),
+                inventories=[self.test_inventory_1, self.test_inventory_2],
+            ),
+        )
+
+        # Search for job cards with specific description
+        result: PaginationBase[JobCard] = self.jobcard_view.read_all(
+            db_session=self.session,
+            search_by="description",
+            search_query="Job Card 1",
+        )
+
+        assert result.total_records == 1
+        assert result.records[0].description == self.test_jobcard_1.description
+
+    def test_search_jobcard_by_invalid_column(self) -> None:
+        """Search job card by invalid column name."""
+        # Create test job cards
+        self.jobcard_view.create(
+            db_session=self.session,
+            record=JobCard(
+                **self.test_jobcard_1.model_dump(),
+                inventories=[self.test_inventory_1],
+            ),
+        )
+        self.jobcard_view.create(
+            db_session=self.session,
+            record=JobCard(
+                **self.test_jobcard_2.model_dump(),
+                inventories=[self.test_inventory_2],
+            ),
+        )
+        self.jobcard_view.create(
+            db_session=self.session,
+            record=JobCard(
+                **self.test_jobcard_3.model_dump(),
+                inventories=[self.test_inventory_1, self.test_inventory_2],
+            ),
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            self.jobcard_view.read_all(
+                db_session=self.session,
+                search_by="invalid",
+                search_query="Job Card 1",
+            )
+
+        assert "Invalid search column" in str(exc_info.value)
+
     def test_update_jobcard(self) -> None:
         """Updating a job card."""
         # Create job card

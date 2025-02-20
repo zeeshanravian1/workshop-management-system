@@ -54,7 +54,7 @@ class TestCustomer(TestSetup):
         )
         self.test_customer_3 = CustomerBase(
             name="Test Customer 3",
-            email="test3@example.com",
+            email="test3@email.com",
             contact_no=PhoneNumber("+923021234567"),
             address="Test Address 3",
         )
@@ -305,6 +305,57 @@ class TestCustomer(TestSetup):
         assert any(c.email == customer_3.email for c in page2_result.records)
         assert all(c.email != customer_1.email for c in page2_result.records)
         assert all(c.email != customer_2.email for c in page2_result.records)
+
+    def test_search_customer_by_email(self) -> None:
+        """Searching customers by email."""
+        # Create test customers
+        self.customer_view.create(
+            db_session=self.session,
+            record=Customer(**self.test_customer_1.model_dump()),
+        )
+        self.customer_view.create(
+            db_session=self.session,
+            record=Customer(**self.test_customer_2.model_dump()),
+        )
+        self.customer_view.create(
+            db_session=self.session,
+            record=Customer(**self.test_customer_3.model_dump()),
+        )
+
+        # Search for customers with specific domain
+        result: PaginationBase[Customer] = self.customer_view.read_all(
+            db_session=self.session,
+            search_by="email",
+            search_query="@example.com",
+        )
+
+        assert result.total_records == 2
+        assert all("@example.com" in str(c.email) for c in result.records)
+
+    def test_search_customer_by_invalid_column(self) -> None:
+        """Search customer by invalid column name."""
+        # Create test customers
+        self.customer_view.create(
+            db_session=self.session,
+            record=Customer(**self.test_customer_1.model_dump()),
+        )
+        self.customer_view.create(
+            db_session=self.session,
+            record=Customer(**self.test_customer_2.model_dump()),
+        )
+        self.customer_view.create(
+            db_session=self.session,
+            record=Customer(**self.test_customer_3.model_dump()),
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            self.customer_view.read_all(
+                db_session=self.session,
+                search_by="invalid",
+                search_query="@example.com",
+            )
+
+        assert "Invalid search column" in str(exc_info.value)
 
     def test_update_customer(self) -> None:
         """Updating a customer."""

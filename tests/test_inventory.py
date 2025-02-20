@@ -414,6 +414,75 @@ class TestInventory(TestSetup):
             i.item_name != inventory_2.item_name for i in page2_result.records
         )
 
+    def test_search_inventory_by_item_name(self) -> None:
+        """Searching inventories by item name."""
+        # Create test inventories
+        self.inventory_view.create(
+            db_session=self.session,
+            record=Inventory(
+                **self.test_inventory_1.model_dump(),
+                suppliers=[self.test_supplier_1],
+            ),
+        )
+        self.inventory_view.create(
+            db_session=self.session,
+            record=Inventory(
+                **self.test_inventory_2.model_dump(),
+                suppliers=[self.test_supplier_1],
+            ),
+        )
+        self.inventory_view.create(
+            db_session=self.session,
+            record=Inventory(
+                **self.test_inventory_3.model_dump(),
+                suppliers=[self.test_supplier_1],
+            ),
+        )
+
+        # Search for inventories with specific domain
+        result: PaginationBase[Inventory] = self.inventory_view.read_all(
+            db_session=self.session,
+            search_by="item_name",
+            search_query="Item 1",
+        )
+
+        assert result.total_records == 1
+        assert result.records[0].item_name == self.test_inventory_1.item_name
+
+    def test_search_inventory_by_invalid_column(self) -> None:
+        """Search inventory by invalid column name."""
+        # Create test inventories
+        self.inventory_view.create(
+            db_session=self.session,
+            record=Inventory(
+                **self.test_inventory_1.model_dump(),
+                suppliers=[self.test_supplier_1],
+            ),
+        )
+        self.inventory_view.create(
+            db_session=self.session,
+            record=Inventory(
+                **self.test_inventory_2.model_dump(),
+                suppliers=[self.test_supplier_1],
+            ),
+        )
+        self.inventory_view.create(
+            db_session=self.session,
+            record=Inventory(
+                **self.test_inventory_3.model_dump(),
+                suppliers=[self.test_supplier_1],
+            ),
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            self.inventory_view.read_all(
+                db_session=self.session,
+                search_by="invalid",
+                search_query="Item 1",
+            )
+
+        assert "Invalid search column" in str(exc_info.value)
+
     def test_update_inventory(self) -> None:
         """Updating an inventory item."""
         # Create inventory item

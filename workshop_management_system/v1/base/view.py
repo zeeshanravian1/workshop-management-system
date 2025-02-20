@@ -8,7 +8,8 @@ Description:
 from collections.abc import Sequence
 from typing import Generic
 
-from sqlmodel import Session, func, select
+from sqlalchemy import ColumnElement
+from sqlmodel import Session, col, func, select
 from sqlmodel.sql._expression_select_cls import SelectOfScalar
 
 from .model import Model, PaginationBase
@@ -66,7 +67,12 @@ class BaseView(Generic[Model]):
         return db_session.get(entity=self.model, ident=record_id)
 
     def read_all(
-        self, db_session: Session, page: int = 1, limit: int = 10
+        self,
+        db_session: Session,
+        page: int = 1,
+        limit: int = 10,
+        search_by: str | None = None,
+        search_query: str | None = None,
     ) -> PaginationBase[Model]:
         """Retrieve paginated records for model.
 
@@ -74,6 +80,8 @@ class BaseView(Generic[Model]):
         - `db_session` (Session): SQLModel database session. **(Required)**
         - `page` (int): Page number to fetch. **(Optional)**
         - `limit` (int): Maximum number of records per page. **(Optional)**
+        - `search_by` (str): Field to search by. **(Optional)**
+        - `search_query` (str): Query string for search. **(Optional)**
 
         :Returns:
         - `PaginationBase`: Object containing:
@@ -88,31 +96,63 @@ class BaseView(Generic[Model]):
             - `records (list[Model])`: List of records for current page.
 
         """
-        # Get total count and calculate pages
-        total_records: int = db_session.exec(
-            select(func.count()).select_from(  # pylint: disable=not-callable
-                self.model
+        # Validate search column
+        if search_by and not hasattr(self.model, search_by):
+            raise ValueError("Invalid search column")
+
+        # Build search condition
+        search_condition: ColumnElement[bool] | None = (
+            col(column_expression=getattr(self.model, search_by)).contains(
+                other=search_query
             )
-        ).one()
+            if search_by and search_query
+            else None
+        )
+
+        # Get total count and calculate pages
+        count_query: SelectOfScalar[int] = select(
+            func.count()  # pylint: disable=not-callable
+        ).select_from(self.model)
+
+        if search_condition is not None:
+            count_query = count_query.where(search_condition)
+
+        total_records: int = db_session.exec(statement=count_query).one()
         total_pages: int = max(1, (total_records + limit - 1) // limit)
 
         # Validate and adjust page number
         page = min(max(1, page), total_pages)
 
+        # Return if no records
+        if total_records == 0:
+            return PaginationBase(
+                current_page=page,
+                limit=limit,
+                total_pages=total_pages,
+                total_records=total_records,
+                next_record_id=None,
+                previous_record_id=None,
+                records=[],
+            )
+
         # Calculate cursor
         cursor: int | None = (page - 1) * limit if page > 1 else None
 
-        # Build and execute query
+        # Build main query with all conditions
         query: SelectOfScalar[Model] = (
             select(self.model)
             .order_by(self.model.id)  # type: ignore
-            .limit(limit)
+            .limit(limit=limit)
         )
+
+        if search_condition is not None:
+            query = query.where(search_condition)
 
         if cursor:
             query = query.where(self.model.id > cursor)
 
-        records: Sequence[Model] = db_session.exec(query).all()
+        # Execute query
+        records: Sequence[Model] = db_session.exec(statement=query).all()
 
         # Calculate cursors
         next_cursor: int | None = (

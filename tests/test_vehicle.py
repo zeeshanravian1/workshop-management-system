@@ -283,6 +283,60 @@ class TestVehicle(TestSetup):
             for v in page2_result.records
         )
 
+    def test_search_vehicle_by_vehicle_number(self) -> None:
+        """Searching vehicles by vehicle number."""
+        # Create test vehicles
+        self.vehicle_view.create(
+            db_session=self.session,
+            record=Vehicle(**self.test_vehicle_1.model_dump()),
+        )
+        self.vehicle_view.create(
+            db_session=self.session,
+            record=Vehicle(**self.test_vehicle_2.model_dump()),
+        )
+        self.vehicle_view.create(
+            db_session=self.session,
+            record=Vehicle(**self.test_vehicle_3.model_dump()),
+        )
+
+        # Search for vehicles with specific vehicle number
+        result: PaginationBase[Vehicle] = self.vehicle_view.read_all(
+            db_session=self.session,
+            search_by="vehicle_number",
+            search_query="ABC",
+        )
+
+        assert result.total_records == 1
+        assert (
+            result.records[0].vehicle_number
+            == self.test_vehicle_1.vehicle_number
+        )
+
+    def test_search_vehicle_by_invalid_column(self) -> None:
+        """Search vehicle by invalid column name."""
+        # Create test vehicles
+        self.vehicle_view.create(
+            db_session=self.session,
+            record=Vehicle(**self.test_vehicle_1.model_dump()),
+        )
+        self.vehicle_view.create(
+            db_session=self.session,
+            record=Vehicle(**self.test_vehicle_2.model_dump()),
+        )
+        self.vehicle_view.create(
+            db_session=self.session,
+            record=Vehicle(**self.test_vehicle_3.model_dump()),
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            self.vehicle_view.read_all(
+                db_session=self.session,
+                search_by="invalid",
+                search_query="ABC",
+            )
+
+        assert "Invalid search column" in str(exc_info.value)
+
     def test_update_vehicle(self) -> None:
         """Updating a vehicle."""
         # Create vehicle

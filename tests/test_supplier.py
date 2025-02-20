@@ -54,7 +54,7 @@ class TestSupplier(TestSetup):
         )
         self.test_supplier_3 = SupplierBase(
             name="Test Supplier 3",
-            email="test3@example.com",
+            email="test3@email.com",
             contact_no=PhoneNumber("+923021234567"),
             address="Test Address 3",
         )
@@ -305,6 +305,57 @@ class TestSupplier(TestSetup):
         assert any(s.email == supplier_3.email for s in page2_result.records)
         assert all(s.email != supplier_1.email for s in page2_result.records)
         assert all(s.email != supplier_2.email for s in page2_result.records)
+
+    def test_search_supplier_by_email(self) -> None:
+        """Searching suppliers by email."""
+        # Create test suppliers
+        self.supplier_view.create(
+            db_session=self.session,
+            record=Supplier(**self.test_supplier_1.model_dump()),
+        )
+        self.supplier_view.create(
+            db_session=self.session,
+            record=Supplier(**self.test_supplier_2.model_dump()),
+        )
+        self.supplier_view.create(
+            db_session=self.session,
+            record=Supplier(**self.test_supplier_3.model_dump()),
+        )
+
+        # Search for suppliers with specific domain
+        result: PaginationBase[Supplier] = self.supplier_view.read_all(
+            db_session=self.session,
+            search_by="email",
+            search_query="@example.com",
+        )
+
+        assert result.total_records == 2
+        assert all("@example.com" in str(c.email) for c in result.records)
+
+    def test_search_supplier_by_invalid_column(self) -> None:
+        """Search supplier by invalid column name."""
+        # Create test suppliers
+        self.supplier_view.create(
+            db_session=self.session,
+            record=Supplier(**self.test_supplier_1.model_dump()),
+        )
+        self.supplier_view.create(
+            db_session=self.session,
+            record=Supplier(**self.test_supplier_2.model_dump()),
+        )
+        self.supplier_view.create(
+            db_session=self.session,
+            record=Supplier(**self.test_supplier_3.model_dump()),
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            self.supplier_view.read_all(
+                db_session=self.session,
+                search_by="invalid",
+                search_query="@example.com",
+            )
+
+        assert "Invalid search column" in str(exc_info.value)
 
     def test_update_supplier(self) -> None:
         """Updating a supplier."""
