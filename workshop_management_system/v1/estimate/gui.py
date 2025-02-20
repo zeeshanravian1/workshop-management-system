@@ -283,7 +283,11 @@ class EstimateDialog(QDialog):
         self.form_layout = QFormLayout(self)
 
         self.total_amount_input = QLineEdit(self)
-        self.status_input = QLineEdit(self)
+        # Replace the QLineEdit with QComboBox for status
+        self.status_input = QComboBox(self)
+        self.status_input.addItems(
+            ["Pending", "In Progress", "Completed", "Cancelled"]
+        )
         self.description_input = QLineEdit(self)
         self.valid_until_input = QLineEdit(self)
         self.vehicle_id_input = QLineEdit(self)
@@ -333,10 +337,15 @@ class EstimateDialog(QDialog):
         self.original_quantities = {}  # Store original quantities for updates
         self.selected_items = []
 
+        # Add a flag to track if this is an update operation
+        self.is_update = estimate_data is not None
+        self.estimate_id = None  # Store estimate ID for updates
+
         # Pre-populate fields if estimate_data is provided
         if estimate_data:
             self.total_amount_input.setText(str(estimate_data["total_amount"]))
-            self.status_input.setText(estimate_data["status"])
+            # Set the current status in the combo box
+            self.status_input.setCurrentText(estimate_data["status"])
             self.description_input.setText(estimate_data["description"] or "")
             self.valid_until_input.setText(estimate_data["valid_until"])
             self.vehicle_id_input.setText(str(estimate_data["vehicle_id"]))
@@ -350,6 +359,10 @@ class EstimateDialog(QDialog):
             # Pre-populate inventory items
             self.selected_items = estimate_data.get("inventory_items", [])
             self.update_inventory_items_table()
+            self.estimate_id = estimate_data.get("id")  # Store the estimate ID
+            # Load existing inventory items into original quantities
+            for item in self.selected_items:
+                self.original_quantities[item["item_name"]] = item["quantity"]
 
     def select_inventory_items(self):
         """Open dialog to select inventory items."""
@@ -412,7 +425,7 @@ class EstimateDialog(QDialog):
 
         return {
             "total_amount": total_amount,
-            "status": self.status_input.text(),
+            "status": self.status_input.currentText(),
             "description": self.description_input.text(),
             "valid_until": self.valid_until_input.text(),
             "vehicle_id": self.vehicle_id_input.text(),
@@ -795,15 +808,20 @@ class EstimateGUI(QWidget):
                 if not estimate:
                     raise ValueError("Estimate not found")
 
-                # Get related inventory items
-                inventory_items = session.exec(
-                    select(InventoryEstimate).where(
-                        InventoryEstimate.estimate_id == int(estimate_id)
+                # Get related inventory items with a proper join
+                inventory_items = (
+                    session.query(InventoryEstimate, Inventory)
+                    .join(
+                        Inventory,
+                        InventoryEstimate.inventory_id == Inventory.id,
                     )
-                ).all()
+                    .filter(InventoryEstimate.estimate_id == int(estimate_id))
+                    .all()
+                )
 
                 # Prepare data for the dialog
                 estimate_data = {
+                    "id": estimate_id,  # Add estimate ID to the data
                     "total_amount": estimate.total_estimate_amount,
                     "status": estimate.status,
                     "description": estimate.description,
@@ -813,11 +831,11 @@ class EstimateGUI(QWidget):
                     "customer_id": estimate.customer_id,
                     "inventory_items": [
                         {
-                            "item_name": item.inventory.item_name,
-                            "quantity": item.quantity_used,
-                            "unit_price": item.unit_price_at_time,
+                            "item_name": inventory.item_name,
+                            "quantity": inv_estimate.quantity_used,
+                            "unit_price": inv_estimate.unit_price_at_time,
                         }
-                        for item in inventory_items
+                        for inv_estimate, inventory in inventory_items
                     ],
                 }
 
@@ -825,10 +843,16 @@ class EstimateGUI(QWidget):
                 dialog = EstimateDialog(self, estimate_data)
 
                 if dialog.exec() == QDialog.DialogCode.Accepted:
-                    # Rest of your existing update logic
                     data = dialog.get_data()
                     try:
                         with Session(engine) as session:
+                            # First, delete existing inventory associations
+                            session.query(InventoryEstimate).filter(
+                                InventoryEstimate.estimate_id
+                                == int(estimate_id)
+                            ).delete()
+
+                            # Update the estimate and create new inventory associations
                             vehicle = session.exec(
                                 select(Vehicle).where(
                                     Vehicle.id == int(data["vehicle_id"])
@@ -841,10 +865,7 @@ class EstimateGUI(QWidget):
                                 db_session=session, record_id=int(estimate_id)
                             )
                             if estimate_obj:
-                                # Get quantity changes
-                                changes = dialog.get_quantity_changes()
-
-                                # Update inventory quantities
+                                # Update inventory quantities for new selections
                                 total_amount = 0
                                 for item in data["inventory_items"]:
                                     inventory = session.exec(
@@ -855,39 +876,27 @@ class EstimateGUI(QWidget):
                                     ).first()
 
                                     if inventory:
-                                        # Update inventory quantity based on changes
-                                        if item["item_name"] in changes:
-                                            inventory.quantity -= changes[
-                                                item["item_name"]
-                                            ]
+                                        # Create new association
+                                        association = InventoryEstimate(
+                                            inventory_id=inventory.id,
+                                            estimate_id=estimate_obj.id,
+                                            quantity_used=item["quantity"],
+                                            unit_price_at_time=item[
+                                                "unit_price"
+                                            ],
+                                        )
+                                        session.add(association)
 
-                                        # Update or create association
-                                        association = session.exec(
-                                            select(InventoryEstimate).where(
-                                                InventoryEstimate.inventory_id
-                                                == inventory.id,
-                                                InventoryEstimate.estimate_id
-                                                == estimate_obj.id,
+                                        # Update inventory quantity
+                                        original_qty = (
+                                            dialog.original_quantities.get(
+                                                item["item_name"], 0
                                             )
-                                        ).first()
-
-                                        if association:
-                                            association.quantity_used = item[
-                                                "quantity"
-                                            ]
-                                            association.unit_price_at_time = (
-                                                item["unit_price"]
-                                            )
-                                        else:
-                                            association = InventoryEstimate(
-                                                inventory_id=inventory.id,
-                                                estimate_id=estimate_obj.id,
-                                                quantity_used=item["quantity"],
-                                                unit_price_at_time=item[
-                                                    "unit_price"
-                                                ],
-                                            )
-                                            session.add(association)
+                                        )
+                                        qty_change = (
+                                            item["quantity"] - original_qty
+                                        )
+                                        inventory.quantity -= qty_change
 
                                         total_amount += (
                                             item["quantity"]
@@ -899,9 +908,6 @@ class EstimateGUI(QWidget):
                                     total_amount
                                 )
                                 estimate_obj.estimate_date = datetime.now()
-                                estimate_obj.total_estimate_amount = data[
-                                    "total_amount"
-                                ]
                                 estimate_obj.status = data["status"]
                                 estimate_obj.description = data["description"]
                                 estimate_obj.valid_until = datetime.strptime(
@@ -914,18 +920,17 @@ class EstimateGUI(QWidget):
                                     if data["job_card_id"]
                                     else None
                                 )
-                                self.estimate_view.update(
-                                    db_session=session,
-                                    record_id=int(estimate_id),
-                                    record=estimate_obj,
-                                )
+
+                                session.commit()
                                 QMessageBox.information(
                                     self,
                                     "Success",
                                     "Estimate updated successfully!",
                                 )
                                 self.load_estimates()
+
                     except Exception as e:
+                        session.rollback()
                         QMessageBox.critical(
                             self, "Error", f"Failed to update estimate: {e!s}"
                         )
