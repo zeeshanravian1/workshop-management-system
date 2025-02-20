@@ -8,10 +8,11 @@ Description:
 import webbrowser  # Add this import
 from datetime import datetime
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QApplication,
+    QCalendarWidget,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -71,25 +72,38 @@ class JobCardDialog(QDialog):
 
         # Add status input
         self.status_input = QComboBox(self)
-        self.status_input.addItems(
-            ["Pending", "Completed", "Cancelled"]
-        )
+        self.status_input.addItems(["Pending", "Completed", "Cancelled"])
 
         self.vehicle_id_input = QComboBox(self)
         self.load_vehicles()
+
+        # Create the calendar widget but keep it hidden initially
+        self.calendar = QCalendarWidget(self)
+        self.calendar.setWindowFlags(Qt.WindowType.Popup)
+        self.calendar.clicked.connect(self.on_date_selected)
+        self.calendar.hide()
+
+        # Create date layout for service date
+        date_layout = QHBoxLayout()
         self.service_date_input = QLineEdit(self)
-        self.service_date_input.setText(
-            datetime.now().strftime("%Y-%m-%d")
-        )  # Auto-fill current date
+        self.service_date_input.setText(datetime.now().strftime("%Y-%m-%d"))
+        date_layout.addWidget(self.service_date_input)
+
+        # Calendar button
+        self.calendar_button = QPushButton("📅")
+        self.calendar_button.setMaximumWidth(40)
+        self.calendar_button.clicked.connect(self.show_calendar)
+        date_layout.addWidget(self.calendar_button)
+
+        # Replace the old form layout line with the new date layout
+        self.form_layout.addRow("Service Date (YYYY-MM-DD):", date_layout)
+
         self.description_input = QLineEdit(self)
 
         self.form_layout.addRow("Vehicle ID:", self.vehicle_id_input)
         self.form_layout.addRow(
             "Status:", self.status_input
         )  # Add status field to form
-        self.form_layout.addRow(
-            "Service Date (YYYY-MM-DD):", self.service_date_input
-        )
         self.form_layout.addRow("Description:", self.description_input)
 
         self.buttons = QDialogButtonBox(
@@ -111,6 +125,37 @@ class JobCardDialog(QDialog):
             self.service_date_input.setText(str(jobcard.service_date))
             self.description_input.setText(jobcard.description)
             self.status_input.setCurrentText(jobcard.status)
+
+    def show_calendar(self):
+        """Show calendar widget below the date input."""
+        try:
+            # Try to set the calendar to the current input date
+            current_date = datetime.strptime(
+                self.service_date_input.text(), "%Y-%m-%d"
+            ).date()
+            self.calendar.setSelectedDate(
+                QDate(current_date.year, current_date.month, current_date.day)
+            )
+        except ValueError:
+            # If current date is invalid, use today's date
+            today = datetime.today()
+            self.calendar.setSelectedDate(
+                QDate(today.year, today.month, today.day)
+            )
+
+        # Position the calendar below the input field
+        pos = self.service_date_input.mapToGlobal(
+            self.service_date_input.rect().bottomLeft()
+        )
+        self.calendar.move(pos)
+        self.calendar.show()
+
+    def on_date_selected(self):
+        """Handle date selection from calendar."""
+        selected_date = self.calendar.selectedDate()
+        formatted_date = f"{selected_date.year()}-{selected_date.month():02d}-{selected_date.day():02d}"
+        self.service_date_input.setText(formatted_date)
+        self.calendar.hide()
 
     def load_vehicles(self):
         """Load vehicles from the database and populate the dropdown."""
