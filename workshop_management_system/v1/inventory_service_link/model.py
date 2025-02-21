@@ -27,3 +27,4 @@ class InventoryServiceLink(SQLModel, table=True):
     service_id: int = Field(
         foreign_key="service.id", primary_key=True, ondelete="CASCADE"
     )
+    quantity: int = Field(default=1, gt=0)

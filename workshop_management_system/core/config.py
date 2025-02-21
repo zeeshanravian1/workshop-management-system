@@ -9,6 +9,7 @@ from datetime import date
 from enum import Enum
 
 DATABASE_URL: str = "sqlite:///database.db"
+INVENTORY_MINIMUM_THRESHOLD: int = 25
 
 
 class InventoryCategory(str, Enum):
