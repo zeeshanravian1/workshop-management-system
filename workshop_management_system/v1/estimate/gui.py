@@ -39,7 +39,7 @@ from workshop_management_system.database.connection import engine
 from workshop_management_system.v1.estimate.model import Estimate
 from workshop_management_system.v1.estimate.view import EstimateView
 from workshop_management_system.v1.inventory.association import (
-    InventoryEstimate,  # Add this import
+    InventoryEstimate,
 )
 from workshop_management_system.v1.inventory.model import Inventory
 from workshop_management_system.v1.vehicle.model import Vehicle

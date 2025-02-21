@@ -5,11 +5,11 @@ Description:
 
 """
 
-import webbrowser  # Add this import
+import webbrowser
 from datetime import datetime
 
 from PyQt6.QtCore import QDate, Qt
-from PyQt6.QtGui import QFont, QIntValidator  # Add QIntValidator here
+from PyQt6.QtGui import QFont, QIntValidator
 from PyQt6.QtWidgets import (
     QApplication,
     QCalendarWidget,

@@ -93,7 +93,7 @@ class HomeGUI(QMainWindow):
 
         # Description
         description_label = QLabel(
-            "Manage your workshop operations efficiently"
+            "Powered by Nex AI"
         )
         description_label.setFont(QFont("Arial", 12))
         description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
