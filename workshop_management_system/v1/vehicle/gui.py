@@ -168,9 +168,9 @@ class CustomerComboBox(QComboBox):
 
     def check_new_customer(self) -> None:
         """Check if 'Add new customer...' is selected and show dialog."""
-        if self.currentIndex() == 1:  # "Add new customer..." option
+        if self.currentIndex() == 1:
             dialog = CustomerDialog(self)
-            dialog.setModal(True)  # Make dialog modal
+            dialog.setModal(True)
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 data = dialog.get_data()
                 try:
