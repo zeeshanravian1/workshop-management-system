@@ -6,10 +6,9 @@ for all tables.
 
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import Engine
-from sqlalchemy.sql.functions import now
 from sqlmodel import Field, MetaData, SQLModel, create_engine
 
 from workshop_management_system.core.config import DATABASE_URL
@@ -32,9 +31,9 @@ class Base(SQLModel):
     """
 
     id: int = Field(primary_key=True)
-    created_at: datetime = Field(default_factory=now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
     updated_at: datetime | None = Field(
-        default=None, sa_column_kwargs={"onupdate": now()}
+        default=None, sa_column_kwargs={"onupdate": datetime.now(tz=UTC)}
     )
 
     class ModelConfig:  # pylint: disable=too-few-public-methods

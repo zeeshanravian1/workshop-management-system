@@ -15,6 +15,20 @@ from workshop_management_system.database.connection import Base
 Model = TypeVar("Model", bound=Base)
 
 
+class Message(SQLModel):
+    """Message Model.
+
+    Description:
+    - This class contains model for message.
+
+    :Attributes:
+    - `message (str)`: Message.
+
+    """
+
+    message: str
+
+
 class PaginationBase(SQLModel, Generic[Model]):
     """Pagination Base Model.
 
@@ -31,6 +45,7 @@ class PaginationBase(SQLModel, Generic[Model]):
     - `previous_record_id (int)`: ID of first record on previous page (None if
     first page)
     - `records (list[Model])`: List of records for current page.
+
     """
 
     current_page: int = Field(default=1, gt=0)

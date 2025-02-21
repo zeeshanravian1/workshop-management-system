@@ -5,6 +5,8 @@ Description:
 
 """
 
+from collections.abc import Sequence
+
 import pytest
 from pydantic import ValidationError
 from pydantic_extra_types.phone_numbers import PhoneNumber
@@ -12,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 
 from tests.conftest import TestSetup
 from workshop_management_system.core.config import InventoryCategory
-from workshop_management_system.v1.base.model import PaginationBase
+from workshop_management_system.v1.base.model import Message, PaginationBase
 from workshop_management_system.v1.inventory.model import (
     Inventory,
     InventoryBase,
@@ -253,6 +255,39 @@ class TestInventory(TestSetup):
         assert self.test_supplier_1 in result.suppliers
         assert self.test_supplier_2 in result.suppliers
 
+    def test_create_multiple_inventories(self) -> None:
+        """Creating multiple inventory items."""
+        # Create multiple test inventories
+        result: Sequence[Inventory] = self.inventory_view.create_multiple(
+            db_session=self.session,
+            records=[
+                Inventory(
+                    **self.test_inventory_1.model_dump(),
+                    suppliers=[self.test_supplier_1],
+                ),
+                Inventory(
+                    **self.test_inventory_2.model_dump(),
+                    suppliers=[self.test_supplier_2],
+                ),
+            ],
+        )
+
+        # Verify inventories are created
+        assert len(result) == 2
+        assert all(i.id is not None for i in result)
+        assert all(i.created_at is not None for i in result)
+        assert all(i.updated_at is None for i in result)
+        assert all(
+            i.model_dump(
+                exclude={"id", "created_at", "updated_at", "suppliers"}
+            )
+            in [
+                self.test_inventory_1.model_dump(),
+                self.test_inventory_2.model_dump(),
+            ]
+            for i in result
+        )
+
     def test_read_inventory_by_id_with_single_supplier(self) -> None:
         """Retrieving an inventory with a single supplier."""
         # Create inventory item
@@ -302,6 +337,36 @@ class TestInventory(TestSetup):
         )
 
         assert result is None
+
+    def test_read_multiple_inventories_by_ids(self) -> None:
+        """Retrieving multiple inventories by ID."""
+        # Create multiple test inventories
+        result: Sequence[Inventory] = self.inventory_view.create_multiple(
+            db_session=self.session,
+            records=[
+                Inventory(
+                    **self.test_inventory_1.model_dump(),
+                    suppliers=[self.test_supplier_1],
+                ),
+                Inventory(
+                    **self.test_inventory_2.model_dump(),
+                    suppliers=[self.test_supplier_2],
+                ),
+            ],
+        )
+
+        # Retrieve multiple inventories by ID
+        retrieved_inventories: Sequence[Inventory] = (
+            self.inventory_view.read_multiple_by_ids(
+                db_session=self.session, record_ids=[i.id for i in result]
+            )
+        )
+
+        assert len(retrieved_inventories) == len(result)
+        assert all(
+            ri.model_dump() == i.model_dump()
+            for ri, i in zip(retrieved_inventories, result, strict=False)
+        )
 
     def test_read_all_inventories(self) -> None:
         """Retrieving all inventories."""
@@ -705,6 +770,63 @@ class TestInventory(TestSetup):
         assert len(db_record.suppliers) == 1
         assert self.test_supplier_1 in db_record.suppliers
 
+    def test_update_multiple_inventories_by_ids(self) -> None:
+        """Updating multiple inventories."""
+        # Create multiple test inventories
+        inventories: Sequence[Inventory] = self.inventory_view.create_multiple(
+            db_session=self.session,
+            records=[
+                Inventory(
+                    **self.test_inventory_1.model_dump(),
+                    suppliers=[self.test_supplier_1],
+                ),
+                Inventory(
+                    **self.test_inventory_2.model_dump(),
+                    suppliers=[self.test_supplier_2],
+                ),
+            ],
+        )
+
+        inventory_1: InventoryBase = InventoryBase(
+            item_name="Updated Test Item 1",
+            quantity=200,
+            unit_price=20.5,
+            minimum_threshold=30,
+            category=InventoryCategory.LUBRICANTS,
+        )
+        inventory_2: InventoryBase = InventoryBase(
+            item_name="Updated Test Item 2",
+            quantity=100,
+            unit_price=25.0,
+            minimum_threshold=15,
+            category=InventoryCategory.SPARE_PARTS,
+        )
+
+        # Update multiple inventories
+        updated_inventories: Sequence[Inventory] = (
+            self.inventory_view.update_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[i.id for i in inventories],
+                records=[
+                    Inventory(**inventory_1.model_dump()),
+                    Inventory(**inventory_2.model_dump()),
+                ],
+            )
+        )
+
+        # Verify inventories are updated
+        assert len(updated_inventories) == 2
+        assert all(i.id is not None for i in updated_inventories)
+        assert all(i.created_at is not None for i in updated_inventories)
+        assert all(i.updated_at is not None for i in updated_inventories)
+        assert all(
+            i.model_dump(
+                exclude={"id", "created_at", "updated_at", "suppliers"}
+            )
+            in [inventory_1.model_dump(), inventory_2.model_dump()]
+            for i in updated_inventories
+        )
+
     def test_delete_inventory_with_single_supplier(self) -> None:
         """Deleting an inventory item with a single supplier."""
         # Create inventory item
@@ -716,12 +838,12 @@ class TestInventory(TestSetup):
             ),
         )
 
-        result: Inventory | None = self.inventory_view.delete_by_id(
+        result: Message | None = self.inventory_view.delete_by_id(
             db_session=self.session, record_id=inventory.id
         )
 
         assert result is not None
-        assert result.id == inventory.id
+        assert result == Message(message="Record deleted successfully")
 
         # Verify inventory no longer exists
         retrieved_inventory: Inventory | None = self.inventory_view.read_by_id(
@@ -749,12 +871,12 @@ class TestInventory(TestSetup):
             ),
         )
 
-        result: Inventory | None = self.inventory_view.delete_by_id(
+        result: Message | None = self.inventory_view.delete_by_id(
             db_session=self.session, record_id=inventory.id
         )
 
         assert result is not None
-        assert result.id == inventory.id
+        assert result == Message(message="Record deleted successfully")
 
         # Verify inventory no longer exists
         retrieved_inventory: Inventory | None = self.inventory_view.read_by_id(
@@ -780,7 +902,7 @@ class TestInventory(TestSetup):
         """Deleting a non-existent inventory item."""
         non_existent_id: int = -1
 
-        result: Inventory | None = self.inventory_view.delete_by_id(
+        result: Message | None = self.inventory_view.delete_by_id(
             db_session=self.session, record_id=non_existent_id
         )
 
@@ -805,12 +927,12 @@ class TestInventory(TestSetup):
         )
 
         # Delete first inventory item
-        result_1: Inventory | None = self.inventory_view.delete_by_id(
+        result_1: Message | None = self.inventory_view.delete_by_id(
             db_session=self.session, record_id=inventory_1.id
         )
 
         assert result_1 is not None
-        assert result_1.id == inventory_1.id
+        assert result_1 == Message(message="Record deleted successfully")
 
         # Verify first inventory no longer exists
         retrieved_inventory_1: Inventory | None = (
@@ -840,12 +962,12 @@ class TestInventory(TestSetup):
         assert supplier.id == self.test_supplier_1.id
 
         # Delete second inventory item
-        result_2: Inventory | None = self.inventory_view.delete_by_id(
+        result_2: Message | None = self.inventory_view.delete_by_id(
             db_session=self.session, record_id=inventory_2.id
         )
 
         assert result_2 is not None
-        assert result_2.id == inventory_2.id
+        assert result_2 == Message(message="Record deleted successfully")
 
         # Verify second inventory no longer exists
         retrieved_inventory2: Inventory | None = (
@@ -876,12 +998,12 @@ class TestInventory(TestSetup):
         )
 
         # Delete inventory item
-        result: Inventory | None = self.inventory_view.delete_by_id(
+        result: Message | None = self.inventory_view.delete_by_id(
             db_session=self.session, record_id=inventory.id
         )
 
         assert result is not None
-        assert result.id == inventory.id
+        assert result == Message(message="Record deleted successfully")
 
         # Verify inventory no longer exists
         retrieved_inventory: Inventory | None = self.inventory_view.read_by_id(
@@ -899,3 +1021,52 @@ class TestInventory(TestSetup):
         assert supplier is not None
         assert supplier.id == self.test_supplier_1.id
         assert len(supplier.inventories) == 0
+
+    def test_delete_multiple_inventories_by_ids(self) -> None:
+        """Deleting multiple inventory items."""
+        # Create multiple test inventories
+        inventories: Sequence[Inventory] = self.inventory_view.create_multiple(
+            db_session=self.session,
+            records=[
+                Inventory(
+                    **self.test_inventory_1.model_dump(),
+                    suppliers=[self.test_supplier_1],
+                ),
+                Inventory(
+                    **self.test_inventory_2.model_dump(),
+                    suppliers=[self.test_supplier_2],
+                ),
+            ],
+        )
+
+        result: Message | None = self.inventory_view.delete_multiple_by_ids(
+            db_session=self.session, record_ids=[i.id for i in inventories]
+        )
+
+        assert result is not None
+        assert result == Message(message="Records deleted successfully")
+
+        # Verify inventories no longer exist
+        retrieved_inventories: Sequence[Inventory] = (
+            self.inventory_view.read_multiple_by_ids(
+                db_session=self.session, record_ids=[i.id for i in inventories]
+            )
+        )
+
+        assert len(retrieved_inventories) == 0
+
+        # Verify suppliers still exist
+        suppliers: Sequence[Supplier] = (
+            self.supplier_view.read_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[
+                    self.test_supplier_1.id,
+                    self.test_supplier_2.id,
+                ],
+            )
+        )
+
+        assert len(suppliers) == 2
+        assert any(s.id == self.test_supplier_1.id for s in suppliers)
+        assert any(s.id == self.test_supplier_2.id for s in suppliers)
+        assert all(len(s.inventories) == 0 for s in suppliers)

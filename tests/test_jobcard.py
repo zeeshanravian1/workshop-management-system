@@ -5,6 +5,7 @@ Description:
 
 """
 
+from collections.abc import Sequence
 from datetime import date, timedelta
 
 import pytest
@@ -16,7 +17,7 @@ from workshop_management_system.core.config import (
     InventoryCategory,
     ServiceStatus,
 )
-from workshop_management_system.v1.base.model import PaginationBase
+from workshop_management_system.v1.base.model import Message, PaginationBase
 from workshop_management_system.v1.customer.model import Customer, CustomerBase
 from workshop_management_system.v1.customer.view import CustomerView
 from workshop_management_system.v1.inventory.model import (
@@ -287,6 +288,36 @@ class TestJobCard(TestSetup):
         assert self.test_inventory_1 in result.inventories
         assert self.test_inventory_2 in result.inventories
 
+    def test_create_multiple_jobcards(self) -> None:
+        """Creating multiple job cards."""
+        # Create multiple job cards
+        result: Sequence[JobCard] = self.jobcard_view.create_multiple(
+            db_session=self.session,
+            records=[
+                JobCard(
+                    **self.test_jobcard_1.model_dump(),
+                    inventories=[self.test_inventory_1],
+                ),
+                JobCard(
+                    **self.test_jobcard_2.model_dump(),
+                    inventories=[self.test_inventory_2],
+                ),
+            ],
+        )
+
+        assert len(result) == 2
+        assert all(j.id is not None for j in result)
+        assert all(j.created_at is not None for j in result)
+        assert all(j.updated_at is None for j in result)
+        assert all(
+            j.model_dump(exclude={"id", "created_at", "updated_at", "vehicle"})
+            in [
+                self.test_jobcard_1.model_dump(),
+                self.test_jobcard_2.model_dump(),
+            ]
+            for j in result
+        )
+
     def test_read_jobcard_by_id_with_single_inventory(self) -> None:
         """Retrieving a job card by ID with single inventory item."""
         # Create job card
@@ -339,6 +370,36 @@ class TestJobCard(TestSetup):
         )
 
         assert result is None
+
+    def test_read_multiple_jobcards_by_ids(self) -> None:
+        """Retrieving multiple job cards by IDs."""
+        # Create multiple job cards
+        result: Sequence[JobCard] = self.jobcard_view.create_multiple(
+            db_session=self.session,
+            records=[
+                JobCard(
+                    **self.test_jobcard_1.model_dump(),
+                    inventories=[self.test_inventory_1],
+                ),
+                JobCard(
+                    **self.test_jobcard_2.model_dump(),
+                    inventories=[self.test_inventory_2],
+                ),
+            ],
+        )
+
+        retrieved_jobcards: Sequence[JobCard] = (
+            self.jobcard_view.read_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[j.id for j in result],
+            )
+        )
+
+        assert len(retrieved_jobcards) == len(result)
+        assert all(
+            rj.model_dump() == j.model_dump()
+            for rj, j in zip(retrieved_jobcards, result, strict=False)
+        )
 
     def test_read_all_jobcards(self) -> None:
         """Retrieving all job cards."""
@@ -722,6 +783,59 @@ class TestJobCard(TestSetup):
         assert len(db_record.inventories) == 1
         assert self.test_inventory_1 in db_record.inventories
 
+    def test_update_multiple_jobcards_by_ids(self) -> None:
+        """Updating multiple job cards by IDs."""
+        # Create multiple job cards
+        jobcards: Sequence[JobCard] = self.jobcard_view.create_multiple(
+            db_session=self.session,
+            records=[
+                JobCard(
+                    **self.test_jobcard_1.model_dump(),
+                    inventories=[self.test_inventory_1],
+                ),
+                JobCard(
+                    **self.test_jobcard_2.model_dump(),
+                    inventories=[self.test_inventory_2],
+                ),
+            ],
+        )
+
+        updated_jobcard_1: JobCardBase = JobCardBase(
+            status=ServiceStatus.IN_PROGRESS,
+            service_date=date.today() + timedelta(days=1),
+            description="Updated Test Job Card 1",
+            vehicle_id=self.test_vehicle_1.id,
+        )
+        updated_jobcard_2: JobCardBase = JobCardBase(
+            status=ServiceStatus.COMPLETED,
+            service_date=date.today() + timedelta(days=2),
+            description="Updated Test Job Card 2",
+            vehicle_id=self.test_vehicle_2.id,
+        )
+
+        # Update multiple job cards
+        updated_jobcards: Sequence[JobCard] = (
+            self.jobcard_view.update_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[j.id for j in jobcards],
+                records=[
+                    JobCard(**updated_jobcard_1.model_dump()),
+                    JobCard(**updated_jobcard_2.model_dump()),
+                ],
+            )
+        )
+
+        # Verify job cards are updated
+        assert len(updated_jobcards) == 2
+        assert all(j.id is not None for j in updated_jobcards)
+        assert all(j.created_at is not None for j in updated_jobcards)
+        assert all(j.updated_at is not None for j in updated_jobcards)
+        assert all(
+            j.model_dump(exclude={"id", "created_at", "updated_at", "vehicle"})
+            in [updated_jobcard_1.model_dump(), updated_jobcard_2.model_dump()]
+            for j in updated_jobcards
+        )
+
     def test_delete_jobcard(self) -> None:
         """Deleting a job card."""
         # Create job card
@@ -733,12 +847,12 @@ class TestJobCard(TestSetup):
             ),
         )
 
-        result: JobCard | None = self.jobcard_view.delete_by_id(
+        result: Message | None = self.jobcard_view.delete_by_id(
             db_session=self.session, record_id=jobcard.id
         )
 
         assert result is not None
-        assert result.id == jobcard.id
+        assert result == Message(message="Record deleted successfully")
 
         # Verify job card no longer exists
         retrieved_jobcard: JobCard | None = self.jobcard_view.read_by_id(
@@ -751,7 +865,7 @@ class TestJobCard(TestSetup):
         """Deleting a non-existent job card."""
         non_existent_id: int = -1
 
-        result: JobCard | None = self.jobcard_view.delete_by_id(
+        result: Message | None = self.jobcard_view.delete_by_id(
             db_session=self.session, record_id=non_existent_id
         )
 
@@ -776,12 +890,12 @@ class TestJobCard(TestSetup):
         )
 
         # Delete first job card
-        result_1: JobCard | None = self.jobcard_view.delete_by_id(
+        result_1: Message | None = self.jobcard_view.delete_by_id(
             db_session=self.session, record_id=jobcard_1.id
         )
 
         assert result_1 is not None
-        assert result_1.id == jobcard_1.id
+        assert result_1 == Message(message="Record deleted successfully")
 
         # Verify first job card no longer exists
         retrieved_jobcard_1: JobCard | None = self.jobcard_view.read_by_id(
@@ -807,12 +921,12 @@ class TestJobCard(TestSetup):
         assert inventory.id == self.test_inventory_1.id
 
         # Delete second job card
-        result_2: JobCard | None = self.jobcard_view.delete_by_id(
+        result_2: Message | None = self.jobcard_view.delete_by_id(
             db_session=self.session, record_id=jobcard_2.id
         )
 
         assert result_2 is not None
-        assert result_2.id == jobcard_2.id
+        assert result_2 == Message(message="Record deleted successfully")
 
         # Verify second job card no longer exists
         retrieved_jobcard2: JobCard | None = self.jobcard_view.read_by_id(
@@ -841,12 +955,12 @@ class TestJobCard(TestSetup):
         )
 
         # Delete job card
-        result: JobCard | None = self.jobcard_view.delete_by_id(
+        result: Message | None = self.jobcard_view.delete_by_id(
             db_session=self.session, record_id=jobcard.id
         )
 
         assert result is not None
-        assert result.id == jobcard.id
+        assert result == Message(message="Record deleted successfully")
 
         # Verify job card no longer exists
         retrieved_jobcard: JobCard | None = self.jobcard_view.read_by_id(
@@ -863,3 +977,52 @@ class TestJobCard(TestSetup):
         assert inventory is not None
         assert inventory.id == self.test_inventory_1.id
         assert len(inventory.jobcards) == 0
+
+    def test_delete_multiple_jobcards_by_ids(self) -> None:
+        """Deleting multiple job cards by IDs."""
+        # Create multiple job cards
+        jobcards: Sequence[JobCard] = self.jobcard_view.create_multiple(
+            db_session=self.session,
+            records=[
+                JobCard(
+                    **self.test_jobcard_1.model_dump(),
+                    inventories=[self.test_inventory_1],
+                ),
+                JobCard(
+                    **self.test_jobcard_2.model_dump(),
+                    inventories=[self.test_inventory_2],
+                ),
+            ],
+        )
+
+        result: Message | None = self.jobcard_view.delete_multiple_by_ids(
+            db_session=self.session, record_ids=[j.id for j in jobcards]
+        )
+
+        assert result is not None
+        assert result == Message(message="Records deleted successfully")
+
+        # Verify job cards no longer exist
+        retrieved_jobcards: Sequence[JobCard] = (
+            self.jobcard_view.read_multiple_by_ids(
+                db_session=self.session, record_ids=[j.id for j in jobcards]
+            )
+        )
+
+        assert len(retrieved_jobcards) == 0
+
+        # Verify inventories still exist
+        inventories: Sequence[Inventory] = (
+            self.inventory_view.read_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[
+                    self.test_inventory_1.id,
+                    self.test_inventory_2.id,
+                ],
+            )
+        )
+
+        assert len(inventories) == 2
+        assert any(i.id == self.test_inventory_1.id for i in inventories)
+        assert any(i.id == self.test_inventory_2.id for i in inventories)
+        assert all(len(i.jobcards) == 0 for i in inventories)

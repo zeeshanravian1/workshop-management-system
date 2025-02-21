@@ -5,9 +5,13 @@ Description:
 
 """
 
+from pydantic import PrivateAttr
 from sqlmodel import Field, Relationship, SQLModel
 
-from workshop_management_system.core.config import InventoryCategory
+from workshop_management_system.core.config import (
+    INVENTORY_MINIMUM_THRESHOLD,
+    InventoryCategory,
+)
 from workshop_management_system.database.connection import Base
 from workshop_management_system.v1.inventory_jobcard_link.model import (
     InventoryJobCardLink,
@@ -39,7 +43,7 @@ class InventoryBase(SQLModel):
     item_name: str = Field(max_length=255, unique=True, index=True)
     quantity: int = Field(gt=0)
     unit_price: float = Field(gt=0)
-    minimum_threshold: int = Field(gt=0)
+    minimum_threshold: int = Field(default=INVENTORY_MINIMUM_THRESHOLD, gt=0)
     category: InventoryCategory = Field(default=InventoryCategory.OTHERS)
 
 
@@ -47,19 +51,22 @@ class Inventory(Base, InventoryBase, table=True):
     """Inventory Table.
 
     Description:
-    - This class contains model for Supplier table.
+    - This class contains model for Inventory table.
 
     :Attributes:
-    - `id (int)`: Unique identifier for supplier.
+    - `id (int)`: Unique identifier for inventory.
     - `item_name (str)`: Name of item.
     - `quantity (int)`: Quantity of item.
     - `unit_price (float)`: Price of item per unit.
     - `minimum_threshold (int)`: Minimum threshold for item.
     - `category (InventoryCategory)`: Category of item.
+    - `service_quantity (int)`: Quantity of item used in service.
     - `created_at (datetime)`: Timestamp when inventory was created.
     - `updated_at (datetime)`: Timestamp when inventory was last updated.
 
     """
+
+    _service_quantity: int = PrivateAttr(default=1)
 
     suppliers: list[Supplier] = Relationship(
         back_populates="inventories", link_model=InventorySupplierLink

@@ -5,13 +5,15 @@ Description:
 
 """
 
+from collections.abc import Sequence
+
 import pytest
 from pydantic import ValidationError
 from pydantic_extra_types.phone_numbers import PhoneNumber
 from sqlalchemy.exc import IntegrityError
 
 from tests.conftest import TestSetup
-from workshop_management_system.v1.base.model import PaginationBase
+from workshop_management_system.v1.base.model import Message, PaginationBase
 from workshop_management_system.v1.customer.model import Customer, CustomerBase
 from workshop_management_system.v1.customer.view import CustomerView
 
@@ -201,6 +203,31 @@ class TestCustomer(TestSetup):
             result.contact_no == str(customer_with_spaces.contact_no).strip()
         )
 
+    def test_create_multiple_customers(self) -> None:
+        """Creating multiple customers."""
+        # Create multiple test customers
+        result: Sequence[Customer] = self.customer_view.create_multiple(
+            db_session=self.session,
+            records=[
+                Customer(**self.test_customer_1.model_dump()),
+                Customer(**self.test_customer_2.model_dump()),
+            ],
+        )
+
+        # Verify customers are created
+        assert len(result) == 2
+        assert all(c.id is not None for c in result)
+        assert all(c.created_at is not None for c in result)
+        assert all(c.updated_at is None for c in result)
+        assert all(
+            c.model_dump(exclude={"id", "created_at", "updated_at"})
+            in [
+                self.test_customer_1.model_dump(),
+                self.test_customer_2.model_dump(),
+            ]
+            for c in result
+        )
+
     def test_read_customer_by_id(self) -> None:
         """Retrieving a customer by ID."""
         customer: Customer = self.customer_view.create(
@@ -223,6 +250,30 @@ class TestCustomer(TestSetup):
         )
 
         assert result is None
+
+    def test_read_multiple_customers_by_ids(self) -> None:
+        """Retrieving multiple customers by ID."""
+        # Create multiple test customers
+        result: Sequence[Customer] = self.customer_view.create_multiple(
+            db_session=self.session,
+            records=[
+                Customer(**self.test_customer_1.model_dump()),
+                Customer(**self.test_customer_2.model_dump()),
+            ],
+        )
+
+        # Retrieve multiple customers by ID
+        retrieved_customers: Sequence[Customer] = (
+            self.customer_view.read_multiple_by_ids(
+                db_session=self.session, record_ids=[c.id for c in result]
+            )
+        )
+
+        assert len(retrieved_customers) == len(result)
+        assert all(
+            rc.model_dump() == c.model_dump()
+            for rc, c in zip(retrieved_customers, result, strict=False)
+        )
 
     def test_read_all_customers(self) -> None:
         """Retrieving all customers."""
@@ -441,6 +492,53 @@ class TestCustomer(TestSetup):
             exc_info.value
         )
 
+    def test_update_multiple_customers_by_ids(self) -> None:
+        """Updating multiple customers."""
+        # Create multiple test customers
+        customers: Sequence[Customer] = self.customer_view.create_multiple(
+            db_session=self.session,
+            records=[
+                Customer(**self.test_customer_1.model_dump()),
+                Customer(**self.test_customer_2.model_dump()),
+            ],
+        )
+
+        customer_1: CustomerBase = CustomerBase(
+            name="Updated Test Customer 1",
+            email="updatedtest1@example.com",
+            contact_no=PhoneNumber("+923031234567"),
+            address="Updated Test Address 1",
+        )
+        customer_2: CustomerBase = CustomerBase(
+            name="Updated Test Customer 2",
+            email="updatedtest2@example.com",
+            contact_no=PhoneNumber("+923041234567"),
+            address="Updated Test Address 2",
+        )
+
+        # Update multiple customers
+        updated_customers: Sequence[Customer] = (
+            self.customer_view.update_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[c.id for c in customers],
+                records=[
+                    Customer(**customer_1.model_dump()),
+                    Customer(**customer_2.model_dump()),
+                ],
+            )
+        )
+
+        # Verify customers are updated
+        assert len(updated_customers) == 2
+        assert all(c.id is not None for c in updated_customers)
+        assert all(c.created_at is not None for c in updated_customers)
+        assert all(c.updated_at is not None for c in updated_customers)
+        assert all(
+            c.model_dump(exclude={"id", "created_at", "updated_at"})
+            in [customer_1.model_dump(), customer_2.model_dump()]
+            for c in updated_customers
+        )
+
     def test_delete_customer(self) -> None:
         """Deleting a customer."""
         customer: Customer = self.customer_view.create(
@@ -448,12 +546,12 @@ class TestCustomer(TestSetup):
             record=Customer(**self.test_customer_1.model_dump()),
         )
 
-        result: Customer | None = self.customer_view.delete_by_id(
+        result: Message | None = self.customer_view.delete_by_id(
             db_session=self.session, record_id=customer.id
         )
 
         assert result is not None
-        assert result.id == customer.id
+        assert result == Message(message="Record deleted successfully")
 
         # Verify customer no longer exists
         retrieved_customer: Customer | None = self.customer_view.read_by_id(
@@ -465,8 +563,35 @@ class TestCustomer(TestSetup):
     def test_delete_non_existent_customer(self) -> None:
         """Deleting a non-existent customer."""
         non_existent_id: int = -1
-        result: Customer | None = self.customer_view.delete_by_id(
+        result: Message | None = self.customer_view.delete_by_id(
             db_session=self.session, record_id=non_existent_id
         )
 
         assert result is None
+
+    def test_delete_multiple_customers_by_ids(self) -> None:
+        """Deleting multiple customers."""
+        # Create multiple test customers
+        customers: Sequence[Customer] = self.customer_view.create_multiple(
+            db_session=self.session,
+            records=[
+                Customer(**self.test_customer_1.model_dump()),
+                Customer(**self.test_customer_2.model_dump()),
+            ],
+        )
+
+        result: Message | None = self.customer_view.delete_multiple_by_ids(
+            db_session=self.session, record_ids=[c.id for c in customers]
+        )
+
+        assert result is not None
+        assert result == Message(message="Records deleted successfully")
+
+        # Verify customers no longer exist
+        retrieved_customers: Sequence[Customer] = (
+            self.customer_view.read_multiple_by_ids(
+                db_session=self.session, record_ids=[c.id for c in customers]
+            )
+        )
+
+        assert len(retrieved_customers) == 0

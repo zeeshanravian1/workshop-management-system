@@ -5,13 +5,15 @@ Description:
 
 """
 
+from collections.abc import Sequence
+
 import pytest
 from pydantic import ValidationError
 from pydantic_extra_types.phone_numbers import PhoneNumber
 from sqlalchemy.exc import IntegrityError
 
 from tests.conftest import TestSetup
-from workshop_management_system.v1.base.model import PaginationBase
+from workshop_management_system.v1.base.model import Message, PaginationBase
 from workshop_management_system.v1.supplier.model import Supplier, SupplierBase
 from workshop_management_system.v1.supplier.view import SupplierView
 
@@ -201,6 +203,31 @@ class TestSupplier(TestSetup):
             result.contact_no == str(supplier_with_spaces.contact_no).strip()
         )
 
+    def test_create_multiple_suppliers(self) -> None:
+        """Creating multiple suppliers."""
+        # Create multiple test suppliers
+        result: Sequence[Supplier] = self.supplier_view.create_multiple(
+            db_session=self.session,
+            records=[
+                Supplier(**self.test_supplier_1.model_dump()),
+                Supplier(**self.test_supplier_2.model_dump()),
+            ],
+        )
+
+        # Verify suppliers are created
+        assert len(result) == 2
+        assert all(c.id is not None for c in result)
+        assert all(c.created_at is not None for c in result)
+        assert all(c.updated_at is None for c in result)
+        assert all(
+            c.model_dump(exclude={"id", "created_at", "updated_at"})
+            in [
+                self.test_supplier_1.model_dump(),
+                self.test_supplier_2.model_dump(),
+            ]
+            for c in result
+        )
+
     def test_read_supplier_by_id(self) -> None:
         """Retrieving a supplier by ID."""
         supplier: Supplier = self.supplier_view.create(
@@ -223,6 +250,30 @@ class TestSupplier(TestSetup):
         )
 
         assert result is None
+
+    def test_read_multiple_suppliers_by_ids(self) -> None:
+        """Retrieving multiple suppliers by ID."""
+        # Create multiple test suppliers
+        result: Sequence[Supplier] = self.supplier_view.create_multiple(
+            db_session=self.session,
+            records=[
+                Supplier(**self.test_supplier_1.model_dump()),
+                Supplier(**self.test_supplier_2.model_dump()),
+            ],
+        )
+
+        # Retrieve multiple suppliers by ID
+        retrieved_suppliers: Sequence[Supplier] = (
+            self.supplier_view.read_multiple_by_ids(
+                db_session=self.session, record_ids=[c.id for c in result]
+            )
+        )
+
+        assert len(retrieved_suppliers) == len(result)
+        assert all(
+            rc.model_dump() == c.model_dump()
+            for rc, c in zip(retrieved_suppliers, result, strict=False)
+        )
 
     def test_read_all_suppliers(self) -> None:
         """Retrieving all suppliers."""
@@ -440,6 +491,53 @@ class TestSupplier(TestSetup):
             exc_info.value
         )
 
+    def test_update_multiple_suppliers_by_ids(self) -> None:
+        """Updating multiple suppliers."""
+        # Create multiple test suppliers
+        suppliers: Sequence[Supplier] = self.supplier_view.create_multiple(
+            db_session=self.session,
+            records=[
+                Supplier(**self.test_supplier_1.model_dump()),
+                Supplier(**self.test_supplier_2.model_dump()),
+            ],
+        )
+
+        supplier_1: SupplierBase = SupplierBase(
+            name="Updated Test Supplier 1",
+            email="updatedtest1@example.com",
+            contact_no=PhoneNumber("+923031234567"),
+            address="Updated Test Address 1",
+        )
+        supplier_2: SupplierBase = SupplierBase(
+            name="Updated Test Supplier 2",
+            email="updatedtest2@example.com",
+            contact_no=PhoneNumber("+923041234567"),
+            address="Updated Test Address 2",
+        )
+
+        # Update multiple suppliers
+        updated_suppliers: Sequence[Supplier] = (
+            self.supplier_view.update_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[c.id for c in suppliers],
+                records=[
+                    Supplier(**supplier_1.model_dump()),
+                    Supplier(**supplier_2.model_dump()),
+                ],
+            )
+        )
+
+        # Verify suppliers are updated
+        assert len(updated_suppliers) == 2
+        assert all(c.id is not None for c in updated_suppliers)
+        assert all(c.created_at is not None for c in updated_suppliers)
+        assert all(c.updated_at is not None for c in updated_suppliers)
+        assert all(
+            c.model_dump(exclude={"id", "created_at", "updated_at"})
+            in [supplier_1.model_dump(), supplier_2.model_dump()]
+            for c in updated_suppliers
+        )
+
     def test_delete_supplier(self) -> None:
         """Deleting a supplier."""
         supplier: Supplier = self.supplier_view.create(
@@ -447,12 +545,12 @@ class TestSupplier(TestSetup):
             record=Supplier(**self.test_supplier_1.model_dump()),
         )
 
-        result: Supplier | None = self.supplier_view.delete_by_id(
+        result: Message | None = self.supplier_view.delete_by_id(
             db_session=self.session, record_id=supplier.id
         )
 
         assert result is not None
-        assert result.id == supplier.id
+        assert result == Message(message="Record deleted successfully")
 
         # Verify supplier no longer exists
         retrieved_supplier: Supplier | None = self.supplier_view.read_by_id(
@@ -464,8 +562,35 @@ class TestSupplier(TestSetup):
     def test_delete_non_existent_supplier(self) -> None:
         """Deleting a non-existent supplier."""
         non_existent_id: int = -1
-        result: Supplier | None = self.supplier_view.delete_by_id(
+        result: Message | None = self.supplier_view.delete_by_id(
             db_session=self.session, record_id=non_existent_id
         )
 
         assert result is None
+
+    def test_delete_multiple_suppliers_by_ids(self) -> None:
+        """Deleting multiple suppliers."""
+        # Create multiple test suppliers
+        suppliers: Sequence[Supplier] = self.supplier_view.create_multiple(
+            db_session=self.session,
+            records=[
+                Supplier(**self.test_supplier_1.model_dump()),
+                Supplier(**self.test_supplier_2.model_dump()),
+            ],
+        )
+
+        result: Message | None = self.supplier_view.delete_multiple_by_ids(
+            db_session=self.session, record_ids=[c.id for c in suppliers]
+        )
+
+        assert result is not None
+        assert result == Message(message="Records deleted successfully")
+
+        # Verify suppliers no longer exist
+        retrieved_suppliers: Sequence[Supplier] = (
+            self.supplier_view.read_multiple_by_ids(
+                db_session=self.session, record_ids=[c.id for c in suppliers]
+            )
+        )
+
+        assert len(retrieved_suppliers) == 0

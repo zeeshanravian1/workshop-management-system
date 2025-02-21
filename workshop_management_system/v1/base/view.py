@@ -12,7 +12,7 @@ from sqlalchemy import ColumnElement
 from sqlmodel import Session, col, func, select
 from sqlmodel.sql._expression_select_cls import SelectOfScalar
 
-from .model import Model, PaginationBase
+from .model import Message, Model, PaginationBase
 
 
 class BaseView(Generic[Model]):
@@ -53,6 +53,25 @@ class BaseView(Generic[Model]):
 
         return record
 
+    def create_multiple(
+        self, db_session: Session, records: Sequence[Model]
+    ) -> Sequence[Model]:
+        """Create multiple records in database.
+
+        :Args:
+        - `db_session` (Session): SQLModel database session. **(Required)**
+        - `records` (Sequence[Model]): List of Model objects to be added to
+        database. **(Required)**
+
+        :Returns:
+        - `Sequence[Model]`: List of created records.
+
+        """
+        db_session.add_all(instances=records)
+        db_session.commit()
+
+        return records
+
     def read_by_id(self, db_session: Session, record_id: int) -> Model | None:
         """Retrieve a record by its ID.
 
@@ -65,6 +84,25 @@ class BaseView(Generic[Model]):
 
         """
         return db_session.get(entity=self.model, ident=record_id)
+
+    def read_multiple_by_ids(
+        self, db_session: Session, record_ids: Sequence[int]
+    ) -> Sequence[Model]:
+        """Retrieve multiple records by their IDs.
+
+        :Args:
+        - `db_session` (Session): SQLModel database session. **(Required)**
+        - `record_ids` (Sequence[UUID | int]): List of record IDs.
+        **(Required)**
+
+        :Returns:
+        - `Sequence[Model]`: List of retrieved records.
+
+        """
+        query: SelectOfScalar[Model] = select(self.model).where(
+            col(column_expression=self.model.id).in_(other=record_ids)
+        )
+        return db_session.exec(statement=query).all()
 
     def read_all(
         self,
@@ -199,9 +237,41 @@ class BaseView(Generic[Model]):
 
         return db_record
 
+    def update_multiple_by_ids(
+        self,
+        db_session: Session,
+        record_ids: Sequence[int],
+        records: Sequence[Model],
+    ) -> Sequence[Model]:
+        """Update multiple records by their IDs.
+
+        :Args:
+        - `db_session` (Session): SQLModel database session. **(Required)**
+        - `record_ids` (Sequence[UUID | int]): List of record IDs.
+        **(Required)**
+        - `records` (Sequence[Model]): List of Model objects containing updated
+        fields. **(Required)**
+
+        :Returns:
+        - `Sequence[Model]`: List of updated records.
+
+        """
+        db_records: Sequence[Model] = self.read_multiple_by_ids(
+            db_session=db_session, record_ids=record_ids
+        )
+
+        for db_record, record in zip(db_records, records, strict=False):
+            db_record.sqlmodel_update(
+                obj=record.model_dump(exclude_unset=True)
+            )
+
+        db_session.commit()
+
+        return db_records
+
     def delete_by_id(
         self, db_session: Session, record_id: int
-    ) -> Model | None:
+    ) -> Message | None:
         """Delete a record by its ID.
 
         :Args:
@@ -209,15 +279,43 @@ class BaseView(Generic[Model]):
         - `record_id` (UUID | int): ID of record to delete. **(Required)**
 
         :Returns:
-        - `Model | None`: Deleted record, or None if not found.
+        - `Message | None`: Message indicating that the record has been
+        deleted, or None if not found.
 
         """
         record: Model | None = db_session.get(
             entity=self.model, ident=record_id
         )
 
-        if record:
-            db_session.delete(instance=record)
-            db_session.commit()
+        if not record:
+            return None
 
-        return record
+        db_session.delete(instance=record)
+        db_session.commit()
+
+        return Message(message="Record deleted successfully")
+
+    def delete_multiple_by_ids(
+        self, db_session: Session, record_ids: Sequence[int]
+    ) -> Message | None:
+        """Delete multiple records by their IDs.
+
+        :Args:
+        - `db_session` (Session): SQLModel database session. **(Required)**
+        - `record_ids` (Sequence[UUID | int]): List of record IDs.
+        **(Required)**
+
+        :Returns:
+        - `None`: Indicates that the records have been deleted.
+
+        """
+        records: Sequence[Model] = self.read_multiple_by_ids(
+            db_session=db_session, record_ids=record_ids
+        )
+
+        for record in records:
+            db_session.delete(instance=record)
+
+        db_session.commit()
+
+        return Message(message="Records deleted successfully")
