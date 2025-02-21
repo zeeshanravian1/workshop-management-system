@@ -10,14 +10,14 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QFrame,
     QHBoxLayout,
-    QHeaderView,  # Add this import
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
     QSizePolicy,
     QTableWidget,
-    QTableWidgetItem,  # Add this import
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
