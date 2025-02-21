@@ -551,7 +551,6 @@ class VehicleGUI(QWidget):
             )
 
             with get_session() as session:
-                # Properly using BaseView's read_all method
                 result = self.vehicle_view.read_all(
                     db_session=session,
                     page=self.current_page,
@@ -560,7 +559,6 @@ class VehicleGUI(QWidget):
                     search_query=search_text,
                 )
 
-                # Correct usage of PaginationBase attributes
                 self.prev_button.setEnabled(
                     result.previous_record_id is not None
                 )
@@ -632,7 +630,6 @@ class VehicleGUI(QWidget):
             ),
         ]  # Remove customer from fields list since we'll add it separately
 
-        # Add regular input fields
         for field in fields:
             field_name, label = field[0], field[1]
             widget_class = field[2]
@@ -737,7 +734,6 @@ class VehicleGUI(QWidget):
             dialog, inputs = self.create_input_dialog("Add Vehicle")
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 with get_session() as session:
-                    # Create vehicle with only VehicleBase fields
                     new_vehicle = Vehicle(
                         make=inputs["make"].text(),
                         model=inputs["model"].text(),
@@ -772,7 +768,6 @@ class VehicleGUI(QWidget):
             vehicle_id = int(self.vehicle_table.item(selected_row, 0).text())
 
             with get_session() as session:
-                # Use BaseView's read_by_id method
                 vehicle = self.vehicle_view.read_by_id(
                     db_session=session, record_id=vehicle_id
                 )
@@ -784,15 +779,15 @@ class VehicleGUI(QWidget):
                     "Update Vehicle", vehicle
                 )
                 if dialog.exec() == QDialog.DialogCode.Accepted:
-                    customer_id = inputs["customer"].get_selected_customer_id()
                     updated_vehicle = Vehicle(
                         make=inputs["make"].text(),
                         model=inputs["model"].text(),
                         year=int(inputs["year"].text()),
                         vehicle_number=inputs["vehicle_number"].text(),
-                        customer_id=customer_id,
+                        customer_id=inputs[
+                            "customer"
+                        ].get_selected_customer_id(),
                     )
-                    # Use BaseView's update_by_id method
                     self.vehicle_view.update_by_id(
                         db_session=session,
                         record_id=vehicle_id,
@@ -826,7 +821,6 @@ class VehicleGUI(QWidget):
 
             if confirm == QMessageBox.StandardButton.Yes:
                 with get_session() as session:
-                    # Use BaseView's delete_by_id method
                     if self.vehicle_view.delete_by_id(
                         db_session=session, record_id=vehicle_id
                     ):
@@ -851,7 +845,6 @@ class VehicleGUI(QWidget):
 
     def search_vehicles(self) -> None:
         """Filter vehicles based on search criteria."""
-        # Remove local filtering as it's handled by BaseView
         self.current_page = 1
         self.load_vehicles(refresh_all=True)
 
@@ -916,7 +909,7 @@ class VehicleGUI(QWidget):
             self.vehicle_table.setRowHeight(row, row_height)
 
 
-if __name__ == "__main__":  # Fixed syntax error here - added == operator
+if __name__ == "__main__":
     app = QApplication([])
     window = VehicleGUI()
     window.show()
