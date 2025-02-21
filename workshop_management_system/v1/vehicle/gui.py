@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication,
     QHeaderView,
+    QLabel,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -28,6 +29,12 @@ class VehicleGUI(BaseGUI):
     def __init__(self, parent=None) -> None:
         """Initialize the Vehicle GUI."""
         super().__init__(parent)
+        # Insert header label with designated object name
+        header = QLabel(
+            "Vehicle Management", alignment=Qt.AlignmentFlag.AlignCenter
+        )
+        header.setObjectName("headerLabel")
+        self.layout().insertWidget(0, header)
         self.vehicle_view = VehicleView(Vehicle)
         self.all_items = self.load_vehicles()
         self.filtered_items = self.all_items.copy()
@@ -70,7 +77,7 @@ class VehicleGUI(BaseGUI):
             QMessageBox.information(
                 self, "Update", "Update vehicle functionality"
             )
-# This
+
     def delete_vehicle(self) -> None:
         """Delete the selected vehicle."""
         selected_row = self.customer_table.currentRow()

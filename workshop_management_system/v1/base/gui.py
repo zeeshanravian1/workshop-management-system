@@ -237,6 +237,12 @@ class BaseGUI(QWidget):
                 background-color: white;
                 color: black;
             }
+            QLabel#headerLabel {
+                font-size: 24px;
+                font-weight: bold;
+                color: #333;
+                margin-bottom: 20px;
+            }
             /* ...rest of the styles... */
         """
         target = widget if widget else self
