@@ -29,9 +29,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from sqlmodel import Session
 
-from workshop_management_system.database.connection import engine
+from workshop_management_system.database.session import get_session
 from workshop_management_system.v1.supplier.model import Supplier
 from workshop_management_system.v1.supplier.view import SupplierView
 
@@ -138,23 +137,11 @@ class SupplierGUI(QWidget):
         """Initialize the Supplier GUI."""
         super().__init__(parent)
         self.parent_widget = parent
-        # Replace existing pagination properties with new pagination dictionary
-        self.pagination = {
-            "current_page": 1,
-            "limit": 15,
-            "total_pages": 0,
-            "total_records": 0,
-            "next_record_id": None,
-            "previous_record_id": None,
-            "records": [],
-        }
-        # Keep compatibility properties
-        self.page_size = self.pagination["limit"]
-        self.current_page = self.pagination["current_page"]
+        # Update pagination to match BaseView pattern
+        self.current_page = 1
+        self.page_size = 15
+        self.supplier_view = SupplierView(model=Supplier)
 
-        self.total_records = 0
-        self.all_suppliers = []
-        self.filtered_suppliers = []
         self.setStyleSheet("""
             QWidget {
                 background-color: white;
@@ -386,96 +373,36 @@ class SupplierGUI(QWidget):
             self.parent_widget.back_to_home()
 
     def search_suppliers(self) -> None:
-        """Filter suppliers based on search criteria across all data."""
-        search_text = self.search_input.text().lower()
-        criteria = self.search_criteria.currentText().lower()
-
-        self.filtered_suppliers = self.all_suppliers.copy()
-        if search_text:
-            self.filtered_suppliers = [
-                supplier
-                for supplier in self.all_suppliers
-                if (
-                    (
-                        criteria == "name"
-                        and search_text in supplier.name.lower()
-                    )
-                    or (
-                        criteria == "email"
-                        and search_text in supplier.email.lower()
-                    )
-                    or (
-                        criteria == "contact number"
-                        and search_text in supplier.contact_number.lower()
-                    )
-                    or (
-                        criteria == "address"
-                        and search_text in supplier.address.lower()
-                    )
-                )
-            ]
-
+        """Filter suppliers based on search criteria."""
         self.current_page = 1
-        self.total_records = len(self.filtered_suppliers)
-        self.load_suppliers(refresh_all=False)
+        self.load_suppliers()
 
     def load_suppliers(self, refresh_all=True) -> None:
-        """Load suppliers with pagination."""
+        """Load suppliers using backend pagination."""
         try:
-            with Session(engine) as session:
-                if refresh_all:
-                    self.all_suppliers = self.supplier_view.read_all(
-                        db_session=session
-                    )
-                    self.filtered_suppliers = self.all_suppliers.copy()
+            search_text = self.search_input.text()
+            search_field = (
+                self.search_criteria.currentText().lower()
+                if search_text
+                else None
+            )
 
-                total_records = len(self.filtered_suppliers)
-                total_pages = (
-                    total_records + self.pagination["limit"] - 1
-                ) // self.pagination["limit"]
-
-                # Update pagination state
-                self.pagination.update(
-                    {
-                        "total_records": total_records,
-                        "total_pages": total_pages,
-                    }
+            with get_session() as session:
+                result = self.supplier_view.read_all(
+                    db_session=session,
+                    page=self.current_page,
+                    limit=self.page_size,
+                    search_by=search_field,
+                    search_query=search_text,
                 )
 
-                # Calculate page data
-                start_idx = (
-                    self.pagination["current_page"] - 1
-                ) * self.pagination["limit"]
-                end_idx = start_idx + self.pagination["limit"]
-                current_page_records = self.filtered_suppliers[
-                    start_idx:end_idx
-                ]
-                self.pagination["records"] = current_page_records
-
-                # Update next/previous record IDs
-                if end_idx < total_records:
-                    self.pagination["next_record_id"] = (
-                        self.filtered_suppliers[end_idx].id
-                    )
-                else:
-                    self.pagination["next_record_id"] = None
-
-                if start_idx > 0:
-                    self.pagination["previous_record_id"] = (
-                        self.filtered_suppliers[start_idx - 1].id
-                    )
-                else:
-                    self.pagination["previous_record_id"] = None
-
-                # Update table content and buttons
-                self._update_table_data(current_page_records)
-                self.update_pagination_buttons(total_pages)
+                # Update pagination controls
                 self.prev_button.setEnabled(
-                    self.pagination["previous_record_id"] is not None
+                    result.previous_record_id is not None
                 )
-                self.next_button.setEnabled(
-                    self.pagination["next_record_id"] is not None
-                )
+                self.next_button.setEnabled(result.next_record_id is not None)
+                self._update_table_data(result.records)
+                self.update_pagination_buttons(result.total_pages)
 
         except Exception as e:
             QMessageBox.critical(
@@ -483,18 +410,12 @@ class SupplierGUI(QWidget):
             )
 
     def add_supplier(self) -> None:
-        """Add a new supplier to the database."""
+        """Add supplier using BaseView."""
         dialog = SupplierDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            data = dialog.get_data()
             try:
-                with Session(engine) as session:
-                    new_supplier = Supplier(
-                        name=data["name"],
-                        email=data["email"],
-                        contact_number=data["contact_number"],
-                        address=data["address"],
-                    )
+                with get_session() as session:
+                    new_supplier = Supplier(**dialog.get_data())
                     self.supplier_view.create(
                         db_session=session, record=new_supplier
                     )
@@ -508,89 +429,85 @@ class SupplierGUI(QWidget):
                 )
 
     def update_supplier(self) -> None:
-        """Update an existing supplier."""
-        selected_row = self.supplier_table.currentRow()
-        if selected_row == -1:
-            QMessageBox.warning(
-                self, "Warning", "Please select a supplier to update."
-            )
-            return
-
-        item = self.supplier_table.item(selected_row, 0)
-        if item is None:
-            QMessageBox.warning(
-                self, "Warning", "Selected supplier ID is invalid."
-            )
-            return
-        supplier_id = item.text()
-
+        """Update supplier using BaseView."""
         try:
-            with Session(engine) as session:
-                supplier_obj = self.supplier_view.read_by_id(
-                    db_session=session, record_id=int(supplier_id)
+            selected_row = self.supplier_table.currentRow()
+            if selected_row <= 0:
+                QMessageBox.warning(
+                    self, "Warning", "Please select a supplier to update."
                 )
-                if supplier_obj:
-                    initial_data = {
-                        "name": supplier_obj.name,
-                        "email": supplier_obj.email,
-                        "contact_number": supplier_obj.contact_number,
-                        "address": supplier_obj.address,
-                    }
-                    dialog = SupplierDialog(self, initial_data=initial_data)
-                    if dialog.exec() == QDialog.DialogCode.Accepted:
-                        data = dialog.get_data()
-                        supplier_obj.name = data["name"]
-                        supplier_obj.email = data["email"]
-                        supplier_obj.contact_number = data["contact_number"]
-                        supplier_obj.address = data["address"]
-                        self.supplier_view.update(
-                            db_session=session,
-                            record_id=int(supplier_id),
-                            record=supplier_obj,
-                        )
-                        QMessageBox.information(
-                            self, "Success", "Supplier updated successfully!"
-                        )
-                        self.load_suppliers()
+                return
+
+            supplier_id = int(self.supplier_table.item(selected_row, 0).text())
+
+            with get_session() as session:
+                supplier = self.supplier_view.read_by_id(
+                    db_session=session, record_id=supplier_id
+                )
+                if not supplier:
+                    QMessageBox.warning(self, "Error", "Supplier not found.")
+                    return
+
+                dialog = SupplierDialog(
+                    self,
+                    {
+                        "name": supplier.name,
+                        "email": supplier.email,
+                        "contact_number": supplier.contact_no,
+                        "address": supplier.address,
+                    },
+                )
+
+                if dialog.exec() == QDialog.DialogCode.Accepted:
+                    updated_supplier = Supplier(**dialog.get_data())
+                    self.supplier_view.update_by_id(
+                        db_session=session,
+                        record_id=supplier_id,
+                        record=updated_supplier,
+                    )
+                    QMessageBox.information(
+                        self, "Success", "Supplier updated successfully!"
+                    )
+                    self.load_suppliers()
+
         except Exception as e:
             QMessageBox.critical(
                 self, "Error", f"Failed to update supplier: {e!s}"
             )
 
     def delete_supplier(self) -> None:
-        """Delete a supplier from the database."""
+        """Delete supplier using BaseView."""
         try:
             selected_row = self.supplier_table.currentRow()
-            if selected_row == -1:
+            if selected_row <= 0:
                 QMessageBox.warning(
                     self, "Warning", "Please select a supplier to delete."
                 )
                 return
 
-            item = self.supplier_table.item(selected_row, 0)
-            if item is None:
-                QMessageBox.warning(
-                    self, "Warning", "Selected supplier ID is invalid."
-                )
-                return
-            supplier_id = item.text()
+            supplier_id = int(self.supplier_table.item(selected_row, 0).text())
 
-            confirmation = QMessageBox.question(
+            confirm = QMessageBox.question(
                 self,
-                "Delete Supplier",
+                "Confirm Delete",
                 "Are you sure you want to delete this supplier?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
 
-            if confirmation == QMessageBox.StandardButton.Yes:
-                with Session(engine) as session:
-                    self.supplier_view.delete(
-                        db_session=session, record_id=int(supplier_id)
-                    )
-                    QMessageBox.information(
-                        self, "Success", "Supplier deleted successfully!"
-                    )
-                    self.load_suppliers()
+            if confirm == QMessageBox.StandardButton.Yes:
+                with get_session() as session:
+                    if self.supplier_view.delete_by_id(
+                        db_session=session, record_id=supplier_id
+                    ):
+                        QMessageBox.information(
+                            self, "Success", "Supplier deleted successfully!"
+                        )
+                        self.load_suppliers()
+                    else:
+                        QMessageBox.warning(
+                            self, "Warning", "Supplier not found!"
+                        )
+
         except Exception as e:
             QMessageBox.critical(
                 self, "Error", f"Failed to delete supplier: {e!s}"
