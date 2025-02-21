@@ -3,7 +3,12 @@ import sys
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -13,6 +18,100 @@ from PyQt6.QtWidgets import (
 from workshop_management_system.v1.base.gui import BaseGUI
 from workshop_management_system.v1.inventory.model import Inventory
 from workshop_management_system.v1.inventory.view import InventoryView
+
+
+# Embedded: Dialog for adding a new inventory item.
+class InventoryDialog(QDialog):
+    """Dialog to add a new inventory item."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Add New Inventory")
+        self.setMinimumWidth(400)
+        layout = QFormLayout(self)
+        self.item_name_input = QLineEdit()
+        self.quantity_input = QLineEdit()
+        self.unit_price_input = QLineEdit()
+        self.minimum_threshold_input = QLineEdit()
+        self.category_dropdown = QComboBox()
+        # Add category options.
+        self.category_dropdown.addItem("Maintenance")
+        self.category_dropdown.addItem("Spare Parts")
+        self.category_dropdown.addItem("Others")
+        layout.addRow("Item Name:", self.item_name_input)
+        layout.addRow("Quantity:", self.quantity_input)
+        layout.addRow("Unit Price:", self.unit_price_input)
+        layout.addRow("Minimum Threshold:", self.minimum_threshold_input)
+        layout.addRow("Category:", self.category_dropdown)
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addWidget(self.buttons)
+
+    def get_data(self) -> dict:
+        return {
+            "item_name": self.item_name_input.text().strip(),
+            "quantity": int(self.quantity_input.text().strip() or 0),
+            "unit_price": float(self.unit_price_input.text().strip() or 0),
+            "minimum_threshold": int(
+                self.minimum_threshold_input.text().strip() or 0
+            ),
+            "category": self.category_dropdown.currentText(),
+        }
+
+
+# Embedded: Dialog for updating an existing inventory item.
+class InventoryUpdateDialog(QDialog):
+    """Dialog to update an existing inventory item."""
+
+    def __init__(self, initial_data: dict, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Update Inventory")
+        self.setMinimumWidth(400)
+        layout = QFormLayout(self)
+        self.item_name_input = QLineEdit(initial_data.get("Item Name", ""))
+        self.quantity_input = QLineEdit(str(initial_data.get("Quantity", "")))
+        self.unit_price_input = QLineEdit(
+            str(initial_data.get("Unit Price", ""))
+        )
+        self.minimum_threshold_input = QLineEdit(
+            str(initial_data.get("Minimum Threshold", ""))
+        )
+        self.category_dropdown = QComboBox()
+        self.category_dropdown.addItem("Maintenance")
+        self.category_dropdown.addItem("Spare Parts")
+        self.category_dropdown.addItem("Others")
+        # Set current category if available.
+        current_category = initial_data.get("Category", "Others")
+        index = self.category_dropdown.findText(current_category)
+        if index != -1:
+            self.category_dropdown.setCurrentIndex(index)
+        layout.addRow("Item Name:", self.item_name_input)
+        layout.addRow("Quantity:", self.quantity_input)
+        layout.addRow("Unit Price:", self.unit_price_input)
+        layout.addRow("Minimum Threshold:", self.minimum_threshold_input)
+        layout.addRow("Category:", self.category_dropdown)
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addWidget(self.buttons)
+
+    def get_data(self) -> dict:
+        return {
+            "item_name": self.item_name_input.text().strip(),
+            "quantity": int(self.quantity_input.text().strip() or 0),
+            "unit_price": float(self.unit_price_input.text().strip() or 0),
+            "minimum_threshold": int(
+                self.minimum_threshold_input.text().strip() or 0
+            ),
+            "category": self.category_dropdown.currentText(),
+        }
 
 
 class InventoryGUI(BaseGUI):
@@ -104,13 +203,48 @@ class InventoryGUI(BaseGUI):
             )
 
     def add_inventory(self) -> None:
-        QMessageBox.information(self, "Add", "Add inventory functionality")
+        """Open dialog to add a new inventory item."""
+        dialog = InventoryDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            data = dialog.get_data()
+            # Normally, add the new Inventory to the DB.
+            QMessageBox.information(
+                self,
+                "Inventory Data",
+                f"Item Name: {data['item_name']}\nQuantity: {data['quantity']}\n"
+                f"Unit Price: {data['unit_price']}\nMinimum Threshold: {data['minimum_threshold']}\n"
+                f"Category: {data['category']}",
+            )
 
     def update_inventory(self) -> None:
+        """Open dialog to update the selected inventory item."""
         selected_row = self.customer_table.currentRow()
-        if selected_row >= 0:
+        if selected_row < 1:
+            QMessageBox.warning(
+                self, "Update", "Please select an inventory item to update."
+            )
+            return
+        current_data = {
+            "Item Name": self.customer_table.item(selected_row, 1).text(),
+            "Quantity": int(self.customer_table.item(selected_row, 2).text()),
+            "Unit Price": float(
+                self.customer_table.item(selected_row, 3).text()
+            ),
+            "Minimum Threshold": int(
+                self.customer_table.item(selected_row, 4).text()
+            ),
+            "Category": self.customer_table.item(selected_row, 5).text(),
+        }
+        dialog = InventoryUpdateDialog(initial_data=current_data, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            updated_data = dialog.get_data()
+            # Normally, update the Inventory record in the DB.
             QMessageBox.information(
-                self, "Update", "Update inventory functionality"
+                self,
+                "Updated Inventory Data",
+                f"Item Name: {updated_data['item_name']}\nQuantity: {updated_data['quantity']}\n"
+                f"Unit Price: {updated_data['unit_price']}\nMinimum Threshold: {updated_data['minimum_threshold']}\n"
+                f"Category: {updated_data['category']}",
             )
 
     def delete_inventory(self) -> None:
@@ -138,6 +272,10 @@ class InventoryGUI(BaseGUI):
                 self.update_inventory()
             elif action == delete_action:
                 self.delete_inventory()
+
+    def add(self) -> None:
+        """Override base add method to open the add inventory dialog."""
+        self.add_inventory()
 
 
 if __name__ == "__main__":

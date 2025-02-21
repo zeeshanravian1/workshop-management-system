@@ -10,8 +10,13 @@ import sys
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -21,6 +26,103 @@ from PyQt6.QtWidgets import (
 from workshop_management_system.v1.base.gui import BaseGUI
 from workshop_management_system.v1.vehicle.model import Vehicle
 from workshop_management_system.v1.vehicle.view import VehicleView
+
+
+# Updated: Embedded VehicleDialog class for adding a vehicle with customer dropdown.
+class VehicleDialog(QDialog):
+    """Dialog to add a new vehicle."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Add New Vehicle")
+        self.setMinimumWidth(400)
+        layout = QFormLayout(self)
+        self.make_input = QLineEdit()
+        self.model_input = QLineEdit()
+        self.year_input = QLineEdit()  # Alternatively use QSpinBox
+        self.vehicle_number_input = QLineEdit()
+        # Replace QLineEdit with QComboBox for customer selection
+        self.customer_dropdown = QComboBox()
+        # Placeholder items; replace with actual customer fetching logic.
+        self.customer_dropdown.addItem("Customer A", 1)
+        self.customer_dropdown.addItem("Customer B", 2)
+
+        layout.addRow("Make:", self.make_input)
+        layout.addRow("Model:", self.model_input)
+        layout.addRow("Year:", self.year_input)
+        layout.addRow("Vehicle Number:", self.vehicle_number_input)
+        layout.addRow("Customer:", self.customer_dropdown)
+
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addWidget(self.buttons)
+
+    def get_data(self) -> dict:
+        """Return entered data."""
+        return {
+            "make": self.make_input.text().strip(),
+            "model": self.model_input.text().strip(),
+            "year": int(self.year_input.text().strip() or 0),
+            "vehicle_number": self.vehicle_number_input.text().strip(),
+            "customer_id": int(self.customer_dropdown.currentData()),
+        }
+
+
+# New: Embedded VehicleUpdateDialog class for updating a vehicle.
+class VehicleUpdateDialog(QDialog):
+    """Dialog to update an existing vehicle."""
+
+    def __init__(self, initial_data: dict, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Update Vehicle")
+        self.setMinimumWidth(400)
+        layout = QFormLayout(self)
+        self.make_input = QLineEdit(initial_data.get("make", ""))
+        self.model_input = QLineEdit(initial_data.get("model", ""))
+        self.year_input = QLineEdit(
+            str(initial_data.get("year", ""))
+        )  # Alternatively use QSpinBox
+        self.vehicle_number_input = QLineEdit(
+            initial_data.get("vehicle_number", "")
+        )
+        # Customer dropdown with initial selection using customer_id from initial_data
+        self.customer_dropdown = QComboBox()
+        # Placeholder items; replace with actual customer fetching logic.
+        self.customer_dropdown.addItem("Customer A", 1)
+        self.customer_dropdown.addItem("Customer B", 2)
+        # Set current index based on given customer_id
+        current_id = initial_data.get("customer_id")
+        index = self.customer_dropdown.findData(current_id)
+        if index != -1:
+            self.customer_dropdown.setCurrentIndex(index)
+
+        layout.addRow("Make:", self.make_input)
+        layout.addRow("Model:", self.model_input)
+        layout.addRow("Year:", self.year_input)
+        layout.addRow("Vehicle Number:", self.vehicle_number_input)
+        layout.addRow("Customer:", self.customer_dropdown)
+
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addWidget(self.buttons)
+
+    def get_data(self) -> dict:
+        """Return the updated data."""
+        return {
+            "make": self.make_input.text().strip(),
+            "model": self.model_input.text().strip(),
+            "year": int(self.year_input.text().strip() or 0),
+            "vehicle_number": self.vehicle_number_input.text().strip(),
+            "customer_id": int(self.customer_dropdown.currentData()),
+        }
 
 
 class VehicleGUI(BaseGUI):
@@ -66,16 +168,48 @@ class VehicleGUI(BaseGUI):
         ]
 
     def add_vehicle(self) -> None:
-        """Add a new vehicle to the database."""
-        # Implement the logic to add a new vehicle
-        pass
+        """Add a new vehicle using an embedded dialog window."""
+        dialog = VehicleDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            data = dialog.get_data()
+            # Here you would typically create a Vehicle instance and add it to the DB.
+            # For now, we show the entered data in an information box.
+            QMessageBox.information(
+                self,
+                "Vehicle Data",
+                f"Make: {data['make']}\nModel: {data['model']}\nYear: {data['year']}\n"
+                f"Vehicle Number: {data['vehicle_number']}\nCustomer ID: {data['customer_id']}",
+            )
 
     def update_vehicle(self) -> None:
-        """Update the selected vehicle."""
+        """Update the selected vehicle using an update dialog."""
         selected_row = self.customer_table.currentRow()
-        if selected_row >= 0:
+        if selected_row < 1:
+            QMessageBox.warning(
+                self, "Update", "Please select a vehicle to update."
+            )
+            return
+
+        # Retrieve current data from the selected row
+        current_data = {
+            "make": self.customer_table.item(selected_row, 1).text(),
+            "model": self.customer_table.item(selected_row, 2).text(),
+            "year": int(self.customer_table.item(selected_row, 3).text()),
+            "vehicle_number": self.customer_table.item(selected_row, 4).text(),
+            # For demo, we set a fixed customer id; in a real app, store customer_id in hidden column.
+            "customer_id": 1,
+        }
+
+        dialog = VehicleUpdateDialog(initial_data=current_data, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            updated_data = dialog.get_data()
+            # Here you would normally update the vehicle record in the database.
             QMessageBox.information(
-                self, "Update", "Update vehicle functionality"
+                self,
+                "Updated Vehicle Data",
+                f"Make: {updated_data['make']}\nModel: {updated_data['model']}\n"
+                f"Year: {updated_data['year']}\nVehicle Number: {updated_data['vehicle_number']}\n"
+                f"Customer ID: {updated_data['customer_id']}",
             )
 
     def delete_vehicle(self) -> None:
@@ -194,6 +328,10 @@ class VehicleGUI(BaseGUI):
                 self.update_vehicle()
             elif action == delete_action:
                 self.delete_vehicle()
+
+    def add(self) -> None:
+        """Override base add method to open the add vehicle dialog."""
+        self.add_vehicle()
 
 
 if __name__ == "__main__":
