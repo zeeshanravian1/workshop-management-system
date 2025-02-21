@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,  # Add this import
     QMessageBox,
     QPushButton,
     QSizePolicy,
@@ -436,6 +437,49 @@ class VehicleGUI(QWidget):
 
         self.load_vehicles()
 
+        # Add context menu support
+        self.vehicle_table.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
+        self.vehicle_table.customContextMenuRequested.connect(
+            self._show_context_menu
+        )
+
+    def _show_context_menu(self, position) -> None:
+        """Show context menu for table row."""
+        row = self.vehicle_table.rowAt(position.y())
+        if row <= 0:  # Skip header row
+            return
+
+        self.vehicle_table.selectRow(row)
+        vehicle_id = int(self.vehicle_table.item(row, 0).text())
+
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: white;
+                border: 1px solid #cccccc;
+                padding: 5px;
+            }
+            QMenu::item {
+                padding: 8px 25px;
+                color: black;
+            }
+            QMenu::item:selected {
+                background-color: #e6f3ff;
+            }
+        """)
+
+        update_action = menu.addAction("✏️ Update")
+        menu.addSeparator()
+        delete_action = menu.addAction("🗑️ Delete")
+
+        action = menu.exec(self.vehicle_table.mapToGlobal(position))
+        if action == update_action:
+            self.update_vehicle(vehicle_id)
+        elif action == delete_action:
+            self.delete_vehicle(vehicle_id)
+
     def back_to_home(self) -> None:
         """Navigate back to the home page."""
         if self.parent_widget:
@@ -755,17 +799,20 @@ class VehicleGUI(QWidget):
                 self, "Error", f"Failed to add vehicle: {e!s}"
             )
 
-    def update_vehicle(self) -> None:
+    def update_vehicle(self, vehicle_id: int = None) -> None:
         """Update vehicle using BaseView."""
         try:
-            selected_row = self.vehicle_table.currentRow()
-            if selected_row <= 0:
-                QMessageBox.warning(
-                    self, "Warning", "Please select a vehicle to update."
+            # Get vehicle_id from table if not provided
+            if vehicle_id is None:
+                selected_row = self.vehicle_table.currentRow()
+                if selected_row <= 0:
+                    QMessageBox.warning(
+                        self, "Warning", "Please select a vehicle to update."
+                    )
+                    return
+                vehicle_id = int(
+                    self.vehicle_table.item(selected_row, 0).text()
                 )
-                return
-
-            vehicle_id = int(self.vehicle_table.item(selected_row, 0).text())
 
             with get_session() as session:
                 vehicle = self.vehicle_view.read_by_id(
@@ -796,21 +843,27 @@ class VehicleGUI(QWidget):
                     QMessageBox.information(
                         self, "Success", "Vehicle updated successfully!"
                     )
-                    self.load_vehicles(refresh_all=True)
+                    self.load_vehicles()
 
         except Exception as e:
             QMessageBox.critical(
                 self, "Error", f"Failed to update vehicle: {e!s}"
             )
 
-    def delete_vehicle(self) -> None:
+    def delete_vehicle(self, vehicle_id: int = None) -> None:
         """Delete vehicle using BaseView."""
         try:
-            selected_row = self.vehicle_table.currentRow()
-            if selected_row <= 0:
-                return
-
-            vehicle_id = int(self.vehicle_table.item(selected_row, 0).text())
+            # Get vehicle_id from table if not provided
+            if vehicle_id is None:
+                selected_row = self.vehicle_table.currentRow()
+                if selected_row <= 0:
+                    QMessageBox.warning(
+                        self, "Warning", "Please select a vehicle to delete."
+                    )
+                    return
+                vehicle_id = int(
+                    self.vehicle_table.item(selected_row, 0).text()
+                )
 
             confirm = QMessageBox.question(
                 self,
