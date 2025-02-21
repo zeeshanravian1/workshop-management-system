@@ -5,8 +5,7 @@ Description:
 
 """
 
-import re
-
+from pydantic import ValidationError
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
@@ -17,21 +16,21 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QFrame,
     QHBoxLayout,
-    QHeaderView,  # Add this
+    QHeaderView,
     QLabel,
     QLineEdit,
-    QMenu,  # Add this
+    QMenu,
     QMessageBox,
     QPushButton,
     QSizePolicy,
     QTableWidget,
-    QTableWidgetItem,  # Add this
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
 from workshop_management_system.database.session import get_session
-from workshop_management_system.v1.supplier.model import Supplier
+from workshop_management_system.v1.supplier.model import Supplier, SupplierBase
 from workshop_management_system.v1.supplier.view import SupplierView
 
 
@@ -89,45 +88,40 @@ class SupplierDialog(QDialog):
     def get_data(self):
         """Get the data from the dialog."""
         return {
-            "name": self.name_input.text(),
-            "email": self.email_input.text(),
-            "contact_number": self.contact_number_input.text(),
-            "address": self.address_input.text(),
+            "name": self.name_input.text().strip(),
+            "email": self.email_input.text().strip()
+            or None,  # Handle empty email
+            "contact_no": self.contact_number_input.text().strip(),
+            "address": self.address_input.text().strip()
+            or None,
         }
 
     def accept(self) -> None:
-        """Validate the input fields before accepting the dialog."""
-        if not self.name_input.text().strip():
-            QMessageBox.warning(self, "Validation Error", "Name is required.")
-            return
-        if not self.email_input.text().strip():
-            QMessageBox.warning(self, "Validation Error", "Email is required.")
-            return
-        if not re.match(
-            r"[^@]+@[^@]+\.[^@]+", self.email_input.text().strip()
-        ):
-            QMessageBox.warning(
-                self, "Validation Error", "Invalid email format."
+        """Validate form inputs using SupplierBase model validation."""
+        data = self.get_data()
+
+        try:
+            SupplierBase(
+                name=data["name"],
+                email=data["email"],
+                contact_no=data["contact_no"],
+                address=data["address"],
             )
-            return
-        if not self.contact_number_input.text().strip():
+            super().accept()
+
+        except ValidationError as e:
+            error_messages = []
+            for error in e.errors():
+                field = error["loc"][0]
+                message = error["msg"]
+                error_messages.append(f"{field.title()}: {message}")
+
             QMessageBox.warning(
-                self, "Validation Error", "Contact number is required."
+                self,
+                "Validation Error",
+                "Please correct the following errors:\n\n"
+                + "\n".join(error_messages),
             )
-            return
-        if not re.match(
-            r"^\+?\d{10,15}$", self.contact_number_input.text().strip()
-        ):
-            QMessageBox.warning(
-                self, "Validation Error", "Invalid contact number format."
-            )
-            return
-        if not self.address_input.text().strip():
-            QMessageBox.warning(
-                self, "Validation Error", "Address is required."
-            )
-            return
-        super().accept()
 
 
 class SupplierGUI(QWidget):
@@ -137,7 +131,6 @@ class SupplierGUI(QWidget):
         """Initialize the Supplier GUI."""
         super().__init__(parent)
         self.parent_widget = parent
-        # Update pagination to match BaseView pattern
         self.current_page = 1
         self.page_size = 15
         self.supplier_view = SupplierView(model=Supplier)
@@ -415,7 +408,12 @@ class SupplierGUI(QWidget):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 with get_session() as session:
-                    new_supplier = Supplier(**dialog.get_data())
+                    # Use SupplierBase for validation before creating record
+                    supplier_data = dialog.get_data()
+                    # Validate data using model
+                    SupplierBase(**supplier_data)
+                    # Create supplier after validation
+                    new_supplier = Supplier(**supplier_data)
                     self.supplier_view.create(
                         db_session=session, record=new_supplier
                     )
@@ -615,14 +613,14 @@ class SupplierGUI(QWidget):
         """Load the next page of suppliers."""
         if self.pagination["next_record_id"] is not None:
             self.pagination["current_page"] += 1
-            self.current_page = self.pagination["current_page"]  # Keep in sync
+            self.current_page = self.pagination["current_page"]
             self.load_suppliers(refresh_all=False)
 
     def previous_page(self) -> None:
         """Load the previous page of suppliers."""
         if self.pagination["previous_record_id"] is not None:
             self.pagination["current_page"] -= 1
-            self.current_page = self.pagination["current_page"]  # Keep in sync
+            self.current_page = self.pagination["current_page"]
             self.load_suppliers(refresh_all=False)
 
     def go_to_page(self, page_number: int) -> None:
