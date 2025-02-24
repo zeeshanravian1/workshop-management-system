@@ -86,13 +86,13 @@ class BaseView(Generic[Model]):
         return db_session.get(entity=self.model, ident=record_id)
 
     def read_multiple_by_ids(
-        self, db_session: Session, record_ids: Sequence[int]
+        self, db_session: Session, record_ids: list[int]
     ) -> Sequence[Model]:
         """Retrieve multiple records by their IDs.
 
         :Args:
         - `db_session` (Session): SQLModel database session. **(Required)**
-        - `record_ids` (Sequence[UUID | int]): List of record IDs.
+        - `record_ids` (list[UUID | int]): List of record IDs.
         **(Required)**
 
         :Returns:
@@ -240,14 +240,14 @@ class BaseView(Generic[Model]):
     def update_multiple_by_ids(
         self,
         db_session: Session,
-        record_ids: Sequence[int],
+        record_ids: list[int],
         records: Sequence[Model],
     ) -> Sequence[Model]:
         """Update multiple records by their IDs.
 
         :Args:
         - `db_session` (Session): SQLModel database session. **(Required)**
-        - `record_ids` (Sequence[UUID | int]): List of record IDs.
+        - `record_ids` (list[UUID | int]): List of record IDs.
         **(Required)**
         - `records` (Sequence[Model]): List of Model objects containing updated
         fields. **(Required)**
@@ -296,13 +296,13 @@ class BaseView(Generic[Model]):
         return Message(message="Record deleted successfully")
 
     def delete_multiple_by_ids(
-        self, db_session: Session, record_ids: Sequence[int]
+        self, db_session: Session, record_ids: list[int]
     ) -> Message | None:
         """Delete multiple records by their IDs.
 
         :Args:
         - `db_session` (Session): SQLModel database session. **(Required)**
-        - `record_ids` (Sequence[UUID | int]): List of record IDs.
+        - `record_ids` (list[UUID | int]): List of record IDs.
         **(Required)**
 
         :Returns:

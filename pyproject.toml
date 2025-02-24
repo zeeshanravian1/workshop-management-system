@@ -33,11 +33,11 @@ mypy = "^1.15.0"
 python-lsp-server = {extras = ["all"], version = "^1.12.2"}
 black = "^25.1.0"
 pyupgrade = "^3.19.1"
-ruff = "^0.9.6"
+ruff = "^0.9.7"
 skjold = "^0.6.2"
 bandit = "^1.8.3"
 coverage = "^7.6.12"
-logfire = "^3.6.1"
+logfire = "^3.6.2"
 gitlint = "^0.19.1"
 
 [build-system]
@@ -50,6 +50,9 @@ asyncio_default_fixture_loop_scope = "class"
 [tool.mypy]
 strict = true
 exclude = ["venv", ".venv", "alembic"]
+
+[tool.black]
+line-length = 79
 
 [tool.ruff]
 target-version = "py313"

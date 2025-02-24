@@ -24,6 +24,7 @@ class InventoryJobCardLink(SQLModel, table=True):
     inventory_id: int = Field(
         foreign_key="inventory.id", primary_key=True, ondelete="CASCADE"
     )
-    job_card_id: int = Field(
+    jobcard_id: int = Field(
         foreign_key="jobcard.id", primary_key=True, ondelete="CASCADE"
     )
+    quantity: int = Field(default=1, gt=0)

@@ -11,6 +11,7 @@ from datetime import date, timedelta
 import pytest
 from pydantic import ValidationError
 from pydantic_extra_types.phone_numbers import PhoneNumber
+from sqlmodel import col, select
 
 from tests.conftest import TestSetup
 from workshop_management_system.core.config import (
@@ -25,6 +26,9 @@ from workshop_management_system.v1.inventory.model import (
     InventoryBase,
 )
 from workshop_management_system.v1.inventory.view import InventoryView
+from workshop_management_system.v1.inventory_jobcard_link.model import (
+    InventoryJobCardLink,
+)
 from workshop_management_system.v1.jobcard.model import JobCard, JobCardBase
 from workshop_management_system.v1.jobcard.view import JobCardView
 from workshop_management_system.v1.supplier.model import Supplier, SupplierBase
@@ -33,6 +37,7 @@ from workshop_management_system.v1.vehicle.model import Vehicle, VehicleBase
 from workshop_management_system.v1.vehicle.view import VehicleView
 
 
+# pylint: disable=protected-access
 class TestJobCard(TestSetup):
     """Test cases for job card operations.
 
@@ -119,14 +124,14 @@ class TestJobCard(TestSetup):
         # Create inventory instances for validation
         inventory_1: InventoryBase = InventoryBase(
             item_name="Test Item 1",
-            quantity=10,
+            quantity=50,
             unit_price=100,
             minimum_threshold=5,
             category=InventoryCategory.ELECTRICALS,
         )
         inventory_2: InventoryBase = InventoryBase(
             item_name="Test Item 2",
-            quantity=20,
+            quantity=100,
             unit_price=200,
             minimum_threshold=10,
             category=InventoryCategory.SPARE_PARTS,
@@ -180,7 +185,7 @@ class TestJobCard(TestSetup):
 
     def test_status_validation(self) -> None:
         """Validating status."""
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(expected_exception=ValidationError) as exc_info:
             JobCardBase(
                 status="Invalid Status",  # type: ignore
                 service_date=date.today(),
@@ -200,7 +205,7 @@ class TestJobCard(TestSetup):
     def test_validate_service_date(self) -> None:
         """Validating service date."""
         # Check for invalid date
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(expected_exception=ValidationError) as exc_info:
             JobCardBase(
                 status=ServiceStatus.PENDING,
                 service_date="Invalid Date",  # type: ignore
@@ -213,7 +218,7 @@ class TestJobCard(TestSetup):
         )
 
         # Check if date is in the past
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(expected_exception=ValidationError) as exc_info:
             JobCardBase(
                 status=ServiceStatus.PENDING,
                 service_date=date.today() - timedelta(days=1),
@@ -223,26 +228,11 @@ class TestJobCard(TestSetup):
 
         assert "Date cannot be in the past." in str(exc_info.value)
 
-    def test_create_jobcard(self) -> None:
-        """Creating a job card."""
-        result: JobCard = self.jobcard_view.create(
-            db_session=self.session,
-            record=JobCard(**self.test_jobcard_1.model_dump()),
-        )
+    def test_create_jobcard_single_inventory(self) -> None:
+        """Creating a job card single inventory item."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
 
-        assert result.id is not None
-        assert result.created_at is not None
-        assert result.updated_at is None
-        assert (
-            result.model_dump(
-                exclude={"id", "created_at", "updated_at", "vehicle"}
-            )
-            == self.test_jobcard_1.model_dump()
-        )
-        assert result.vehicle == self.test_vehicle_1
-
-    def test_create_jobcard_with_single_inventory(self) -> None:
-        """Creating a job card with single inventory item."""
         # Create job card
         result: JobCard = self.jobcard_view.create(
             db_session=self.session,
@@ -256,21 +246,46 @@ class TestJobCard(TestSetup):
         assert result.created_at is not None
         assert result.updated_at is None
         assert (
-            result.model_dump(
-                exclude={"id", "created_at", "updated_at", "inventories"}
-            )
+            result.model_dump(exclude={"id", "created_at", "updated_at"})
             == self.test_jobcard_1.model_dump()
         )
         assert len(result.inventories) == 1
         assert result.inventories[0] == self.test_inventory_1
 
-    def test_create_jobcard_with_multiple_inventories(self) -> None:
-        """Creating a job card with multiple inventory items."""
+        # Verify inventory quantity in inventory-jobcard links
+        inventory_jobcard_link: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter_by(
+                    jobcard_id=result.id
+                )
+            )
+        ).all()
+
+        assert inventory_jobcard_link is not None
+        assert (
+            inventory_jobcard_link[0].quantity
+            == self.test_inventory_1._service_quantity
+        )
+
+        # Verify inventory quantity persists in inventory
+        db_inventory: Inventory | None = self.inventory_view.read_by_id(
+            db_session=self.session, record_id=self.test_inventory_1.id
+        )
+
+        assert db_inventory is not None
+        assert db_inventory.quantity == (self.test_inventory_1.quantity)
+
+    def test_create_jobcard_multiple_inventories(self) -> None:
+        """Creating a job card multiple inventory items."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+        self.test_inventory_2._service_quantity = 20
+
         # Create job card
         result: JobCard = self.jobcard_view.create(
             db_session=self.session,
             record=JobCard(
-                **self.test_jobcard_1.model_dump(),
+                **self.test_jobcard_2.model_dump(),
                 inventories=[self.test_inventory_1, self.test_inventory_2],
             ),
         )
@@ -279,49 +294,308 @@ class TestJobCard(TestSetup):
         assert result.created_at is not None
         assert result.updated_at is None
         assert (
-            result.model_dump(
-                exclude={"id", "created_at", "updated_at", "inventories"}
-            )
-            == self.test_jobcard_1.model_dump()
+            result.model_dump(exclude={"id", "created_at", "updated_at"})
+            == self.test_jobcard_2.model_dump()
         )
         assert len(result.inventories) == 2
         assert self.test_inventory_1 in result.inventories
         assert self.test_inventory_2 in result.inventories
 
-    def test_create_multiple_jobcards(self) -> None:
-        """Creating multiple job cards."""
-        # Create multiple job cards
-        result: Sequence[JobCard] = self.jobcard_view.create_multiple(
-            db_session=self.session,
-            records=[
-                JobCard(
+        # Verify inventory quantity in inventory-jobcard links
+        inventory_jobcard_links: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter_by(
+                    jobcard_id=result.id
+                )
+            )
+        ).all()
+
+        assert inventory_jobcard_links is not None
+        assert all(
+            link.quantity == inventory._service_quantity
+            for link, inventory in zip(
+                sorted(inventory_jobcard_links, key=lambda x: x.inventory_id),
+                sorted(
+                    [self.test_inventory_1, self.test_inventory_2],
+                    key=lambda x: x.id,
+                ),
+                strict=True,
+            )
+        )
+
+        # Verify inventories quantity persists in inventory
+        db_inventories: Sequence[Inventory] = (
+            self.inventory_view.read_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[i.id for i in result.inventories],
+            )
+        )
+
+        assert db_inventories is not None
+        assert all(
+            db_inventory.quantity == (inventory.quantity)
+            for db_inventory, inventory in zip(
+                db_inventories, result.inventories, strict=True
+            )
+        )
+
+    def test_create_jobcard_required_quantity_exceeds_available_quantity(
+        self,
+    ) -> None:
+        """Creating a job card required quantity exceeds available quantity."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 100
+
+        # Create job card
+        with pytest.raises(expected_exception=ValueError) as exc_info:
+            self.jobcard_view.create(
+                db_session=self.session,
+                record=JobCard(
                     **self.test_jobcard_1.model_dump(),
                     inventories=[self.test_inventory_1],
                 ),
-                JobCard(
-                    **self.test_jobcard_2.model_dump(),
-                    inventories=[self.test_inventory_2],
+            )
+
+        assert (
+            f"Insufficient quantity for {self.test_inventory_1.item_name}. "
+            f"Required: {self.test_inventory_1._service_quantity}, "
+            f"Available: {self.test_inventory_1.quantity}"
+            in str(exc_info.value)
+        )
+
+    def test_create_jobcard_inventory_quantity_exceeds_inventory_threshold(
+        self,
+    ) -> None:
+        """Creating job card inventory quantity exceeds inventory threshold."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 1000
+
+        # Create job card
+        with pytest.raises(expected_exception=ValueError) as exc_info:
+            self.jobcard_view.create(
+                db_session=self.session,
+                record=JobCard(
+                    **self.test_jobcard_1.model_dump(),
+                    inventories=[self.test_inventory_1],
                 ),
-            ],
+            )
+
+        assert (
+            f"Insufficient quantity for {self.test_inventory_1.item_name}. "
+            f"Required: {self.test_inventory_1._service_quantity}, "
+            f"Available: {self.test_inventory_1.quantity}"
+            in str(exc_info.value)
+        )
+
+    def test_create_jobcard_no_inventory(self) -> None:
+        """Creating a job card without inventory."""
+        with pytest.raises(expected_exception=ValueError) as exc_info:
+            self.jobcard_view.create(
+                db_session=self.session,
+                record=JobCard(**self.test_jobcard_1.model_dump()),
+            )
+
+        assert "At least one inventory item is required" in str(exc_info.value)
+
+    def test_create_multiple_jobcards(self) -> None:
+        """Test creating multiple job cards inventory relationships."""
+        # Set different inventory quantities for each job card
+        self.test_inventory_1._service_quantity = 10
+        self.test_inventory_2._service_quantity = 20
+
+        # Create test data with different inventory combinations
+        jobcard_1 = JobCard(
+            **self.test_jobcard_1.model_dump(),
+            inventories=[self.test_inventory_1, self.test_inventory_2],
+        )
+        jobcard_2 = JobCard(
+            **self.test_jobcard_2.model_dump(),
+            inventories=[self.test_inventory_2],
+        )
+
+        # Create job cards
+        result: Sequence[JobCard] = self.jobcard_view.create_multiple(
+            db_session=self.session, records=[jobcard_1, jobcard_2]
         )
 
         assert len(result) == 2
-        assert all(j.id is not None for j in result)
-        assert all(j.created_at is not None for j in result)
-        assert all(j.updated_at is None for j in result)
+        assert all(jobcard.id is not None for jobcard in result)
+        assert all(jobcard.created_at is not None for jobcard in result)
+        assert all(jobcard.updated_at is None for jobcard in result)
         assert all(
-            j.model_dump(exclude={"id", "created_at", "updated_at", "vehicle"})
+            jobcard.model_dump(exclude={"id", "created_at", "updated_at"})
             in [
                 self.test_jobcard_1.model_dump(),
                 self.test_jobcard_2.model_dump(),
             ]
-            for j in result
+            for jobcard in result
+        )
+        assert all(len(jobcard.inventories) > 0 for jobcard in result)
+
+        # Verify inventory quantity in inventory-jobcard links
+        inventory_jobcard_links: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter(
+                    col(column_expression=InventoryJobCardLink.jobcard_id).in_(
+                        [jobcard.id for jobcard in result]
+                    )
+                )
+            )
+        ).all()
+
+        jobcard_inventory_quantity: dict[tuple[int, int], int] = {
+            (link.jobcard_id, link.inventory_id): link.quantity
+            for link in inventory_jobcard_links
+        }
+
+        assert inventory_jobcard_links is not None
+        assert len(inventory_jobcard_links) == 3
+        assert all(
+            jobcard_inventory_quantity[(jobcard.id, inventory.id)]
+            == inventory._service_quantity
+            for jobcard in result
+            for inventory in jobcard.inventories
         )
 
-    def test_read_jobcard_by_id_with_single_inventory(self) -> None:
-        """Retrieving a job card by ID with single inventory item."""
+        # Verify inventories quantity persists in inventory
+        db_inventories: Sequence[Inventory] = (
+            self.inventory_view.read_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[
+                    inventory.id
+                    for jobcard in result
+                    for inventory in jobcard.inventories
+                ],
+            )
+        )
+
+        assert db_inventories is not None
+        assert all(
+            db_inventory.quantity == (inventory.quantity)
+            for db_inventory, inventory in zip(
+                db_inventories,
+                [self.test_inventory_1, self.test_inventory_2],
+                strict=False,
+            )
+        )
+
+    def test_create_multiple_jobcards_different_quantities(self) -> None:
+        """Test creating multiple job cards different inventory quantities."""
+        # Set different inventory quantities for each job card
+        self.test_inventory_1._service_quantity = 10
+        self.test_inventory_2._service_quantity = 20
+
+        quantities: dict[str, dict[int, int]] = {
+            "jobcard_1": {
+                self.test_inventory_1.id: (
+                    self.test_inventory_1._service_quantity
+                ),
+                self.test_inventory_2.id: (
+                    self.test_inventory_2._service_quantity
+                ),
+            },
+        }
+
+        # Create test data with different inventory combinations
+        jobcard_1 = JobCard(
+            **self.test_jobcard_1.model_dump(),
+            inventories=[self.test_inventory_1, self.test_inventory_2],
+        )
+
+        db_jobcard_1: JobCard = self.jobcard_view.create(
+            db_session=self.session, record=jobcard_1
+        )
+
+        # Set different inventory quantities for each job card
+        self.test_inventory_1._service_quantity = 5
+        self.test_inventory_2._service_quantity = 15
+
+        quantities["jobcard_2"] = {
+            self.test_inventory_1.id: self.test_inventory_1._service_quantity,
+            self.test_inventory_2.id: self.test_inventory_2._service_quantity,
+        }
+
+        jobcard_2 = JobCard(
+            **self.test_jobcard_2.model_dump(),
+            inventories=[self.test_inventory_1, self.test_inventory_2],
+        )
+
+        db_jobcard_2: JobCard = self.jobcard_view.create(
+            db_session=self.session, record=jobcard_2
+        )
+
+        assert db_jobcard_1.id is not None
+        assert db_jobcard_2.id is not None
+        assert db_jobcard_1.created_at is not None
+        assert db_jobcard_2.created_at is not None
+        assert db_jobcard_1.updated_at is None
+        assert db_jobcard_2.updated_at is None
+        assert (
+            db_jobcard_1.model_dump(exclude={"id", "created_at", "updated_at"})
+            == self.test_jobcard_1.model_dump()
+        )
+        assert (
+            db_jobcard_2.model_dump(exclude={"id", "created_at", "updated_at"})
+            == self.test_jobcard_2.model_dump()
+        )
+        assert len(db_jobcard_1.inventories) == 2
+        assert len(db_jobcard_2.inventories) == 2
+
+        # Verify inventory quantity in inventory-jobcard links
+        inventory_jobcard_links: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter(
+                    col(column_expression=InventoryJobCardLink.jobcard_id).in_(
+                        [db_jobcard_1.id, db_jobcard_2.id]
+                    )
+                )
+            )
+        ).all()
+
+        jobcard_inventory_quantity: dict[tuple[int, int], int] = {
+            (link.jobcard_id, link.inventory_id): link.quantity
+            for link in inventory_jobcard_links
+        }
+
+        assert inventory_jobcard_links is not None
+        assert len(inventory_jobcard_links) == 4
+        assert all(
+            jobcard_inventory_quantity[(jobcard.id, inventory.id)]
+            == quantities[f"jobcard_{idx + 1}"][inventory.id]
+            for idx, jobcard in enumerate([db_jobcard_1, db_jobcard_2])
+            for inventory in jobcard.inventories
+        )
+
+        # Verify inventories quantity persists in inventory
+        db_inventories: Sequence[Inventory] = (
+            self.inventory_view.read_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[
+                    inventory.id
+                    for jobcard in [db_jobcard_1, db_jobcard_2]
+                    for inventory in jobcard.inventories
+                ],
+            )
+        )
+
+        assert db_inventories is not None
+        assert len(db_inventories) == 2
+        assert all(
+            db_inventory.quantity == (inventory.quantity)
+            for db_inventory, inventory in zip(
+                db_inventories,
+                [self.test_inventory_1, self.test_inventory_2],
+                strict=False,
+            )
+        )
+
+    def test_read_jobcard_by_id_single_inventory(self) -> None:
+        """Retrieving a job card by ID single inventory item."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+
         # Create job card
-        jobcard: JobCard = self.jobcard_view.create(
+        db_jobcard: JobCard = self.jobcard_view.create(
             db_session=self.session,
             record=JobCard(
                 **self.test_jobcard_1.model_dump(),
@@ -329,34 +603,38 @@ class TestJobCard(TestSetup):
             ),
         )
 
+        # Read job card by ID
         result: JobCard | None = self.jobcard_view.read_by_id(
-            db_session=self.session,
-            record_id=jobcard.id,
+            db_session=self.session, record_id=db_jobcard.id
         )
 
         assert result is not None
-        assert jobcard.model_dump() == result.model_dump()
+        assert result.model_dump() == db_jobcard.model_dump()
         assert len(result.inventories) == 1
-        assert result.inventories[0] == self.test_inventory_1
+        assert self.test_inventory_1 in result.inventories
 
-    def test_read_jobcard_by_id_with_multiple_inventories(self) -> None:
-        """Retrieving a job card by ID with multiple inventory items."""
+    def test_read_jobcard_by_id_multiple_inventories(self) -> None:
+        """Retrieving a job card by ID multiple inventory items."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+        self.test_inventory_2._service_quantity = 20
+
         # Create job card
-        jobcard: JobCard = self.jobcard_view.create(
+        db_jobcard: JobCard = self.jobcard_view.create(
             db_session=self.session,
             record=JobCard(
-                **self.test_jobcard_1.model_dump(),
+                **self.test_jobcard_2.model_dump(),
                 inventories=[self.test_inventory_1, self.test_inventory_2],
             ),
         )
 
+        # Read job card by ID
         result: JobCard | None = self.jobcard_view.read_by_id(
-            db_session=self.session,
-            record_id=jobcard.id,
+            db_session=self.session, record_id=db_jobcard.id
         )
 
         assert result is not None
-        assert jobcard.model_dump() == result.model_dump()
+        assert result.model_dump() == db_jobcard.model_dump()
         assert len(result.inventories) == 2
         assert self.test_inventory_1 in result.inventories
         assert self.test_inventory_2 in result.inventories
@@ -364,6 +642,7 @@ class TestJobCard(TestSetup):
     def test_read_non_existent_jobcard(self) -> None:
         """Retrieving a non-existent job card."""
         non_existent_id: int = -1
+
         result: JobCard | None = self.jobcard_view.read_by_id(
             db_session=self.session,
             record_id=non_existent_id,
@@ -373,6 +652,10 @@ class TestJobCard(TestSetup):
 
     def test_read_multiple_jobcards_by_ids(self) -> None:
         """Retrieving multiple job cards by IDs."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+        self.test_inventory_2._service_quantity = 20
+
         # Create multiple job cards
         result: Sequence[JobCard] = self.jobcard_view.create_multiple(
             db_session=self.session,
@@ -399,6 +682,14 @@ class TestJobCard(TestSetup):
         assert all(
             rj.model_dump() == j.model_dump()
             for rj, j in zip(retrieved_jobcards, result, strict=False)
+        )
+        assert all(
+            inventory in jobcard.inventories
+            for jobcard, inventory in zip(
+                retrieved_jobcards,
+                [self.test_inventory_1, self.test_inventory_2],
+                strict=False,
+            )
         )
 
     def test_read_all_jobcards(self) -> None:
@@ -432,17 +723,17 @@ class TestJobCard(TestSetup):
 
         # Assert records content
         assert len(result.records) == 2
-        assert any(
-            j.description == self.test_jobcard_1.description
-            for j in result.records
-        )
-        assert any(
-            j.description == self.test_jobcard_2.description
+        assert all(
+            j.description
+            in [
+                self.test_jobcard_1.description,
+                self.test_jobcard_2.description,
+            ]
             for j in result.records
         )
 
     def test_read_all_jobcards_pagination(self) -> None:
-        """Job card pagination with multiple pages."""
+        """Job card pagination multiple pages."""
         # Create job cards to test pagination
         jobcard_1: JobCard = self.jobcard_view.create(
             db_session=self.session,
@@ -478,16 +769,9 @@ class TestJobCard(TestSetup):
         assert page1_result.next_record_id == jobcard_2.id + 1
         assert page1_result.previous_record_id is None
         assert len(page1_result.records) == 2
-        assert any(
-            j.description == jobcard_1.description
-            for j in page1_result.records
-        )
-        assert any(
-            j.description == jobcard_2.description
-            for j in page1_result.records
-        )
         assert all(
-            j.description != jobcard_3.description
+            j.description in [jobcard_1.description, jobcard_2.description]
+            and j.description != jobcard_3.description
             for j in page1_result.records
         )
 
@@ -503,16 +787,10 @@ class TestJobCard(TestSetup):
         assert page2_result.next_record_id is None
         assert page2_result.previous_record_id == 1
         assert len(page2_result.records) == 1
-        assert any(
-            j.description == jobcard_3.description
-            for j in page2_result.records
-        )
         assert all(
-            j.description != jobcard_1.description
-            for j in page2_result.records
-        )
-        assert all(
-            j.description != jobcard_2.description
+            j.description in [jobcard_3.description]
+            and j.description
+            not in [jobcard_1.description, jobcard_2.description]
             for j in page2_result.records
         )
 
@@ -548,8 +826,19 @@ class TestJobCard(TestSetup):
             search_query="Job Card 1",
         )
 
+        assert result.current_page == 1
+        assert result.limit == 10
+        assert result.total_pages == 1
         assert result.total_records == 1
-        assert result.records[0].description == self.test_jobcard_1.description
+        assert result.next_record_id is None
+        assert result.previous_record_id is None
+
+        # Assert records content
+        assert len(result.records) == 1
+        assert all(
+            j.description == self.test_jobcard_1.description
+            for j in result.records
+        )
 
     def test_search_jobcard_by_invalid_column(self) -> None:
         """Search job card by invalid column name."""
@@ -576,7 +865,7 @@ class TestJobCard(TestSetup):
             ),
         )
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(expected_exception=ValueError) as exc_info:
             self.jobcard_view.read_all(
                 db_session=self.session,
                 search_by="invalid",
@@ -587,8 +876,11 @@ class TestJobCard(TestSetup):
 
     def test_update_jobcard(self) -> None:
         """Updating a job card."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+
         # Create job card
-        jobcard: JobCard = self.jobcard_view.create(
+        db_jobcard: JobCard = self.jobcard_view.create(
             db_session=self.session,
             record=JobCard(
                 **self.test_jobcard_1.model_dump(),
@@ -596,99 +888,510 @@ class TestJobCard(TestSetup):
             ),
         )
 
-        # Update job card
-        result: JobCard | None = self.jobcard_view.update_by_id(
-            db_session=self.session,
-            record_id=jobcard.id,
-            record=JobCard(**self.test_jobcard_2.model_dump()),
-        )
-
-        assert result is not None
-        assert result.id == jobcard.id
-        assert result.model_dump() == jobcard.model_dump()
-
-    def test_update_non_existent_jobcard(self) -> None:
-        """Updating a non-existent job card."""
-        non_existent_id: int = -1
-        result: JobCard | None = self.jobcard_view.update_by_id(
-            db_session=self.session,
-            record_id=non_existent_id,
-            record=JobCard(**self.test_jobcard_2.model_dump()),
-        )
-
-        assert result is None
-
-    def test_update_jobcard_inventory_with_single_inventory(self) -> None:
-        """Updating a job card with single inventory item."""
-        # Create job card
-        jobcard: JobCard = self.jobcard_view.create(
-            db_session=self.session,
-            record=JobCard(
-                **self.test_jobcard_1.model_dump(),
-                inventories=[self.test_inventory_1],
-            ),
+        updated_jobcard: JobCardBase = JobCardBase(
+            status=ServiceStatus.IN_PROGRESS,
+            service_date=date.today() + timedelta(days=1),
+            description="Updated Test Job Card",
+            vehicle_id=self.test_vehicle_1.id,
         )
 
         # Update inventory
-        result: JobCard | None = self.jobcard_view.update_inventory(
+        result: JobCard | None = self.jobcard_view.update_by_id(
             db_session=self.session,
-            record_id=jobcard.id,
-            previous_inventory_id=self.test_inventory_1.id,
-            new_inventory_id=self.test_inventory_2.id,
+            record_id=db_jobcard.id,
+            record=JobCard(
+                **updated_jobcard.model_dump(),
+                inventories=[self.test_inventory_1],
+            ),
         )
 
         assert result is not None
-        assert result.id == jobcard.id
+        assert result.created_at is not None
+        assert result.updated_at is not None
+        assert (
+            result.model_dump(exclude={"id", "created_at", "updated_at"})
+            == updated_jobcard.model_dump()
+        )
         assert len(result.inventories) == 1
-        assert self.test_inventory_2 in result.inventories
-        assert self.test_inventory_1 not in result.inventories
+        assert result.inventories[0] == self.test_inventory_1
 
-    def test_update_jobcard_inventory_with_multiple_inventories(self) -> None:
-        """Updating a job card with multiple inventory items."""
+        # Verify inventory quantity in inventory-jobcard links
+        inventory_jobcard_link: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter_by(
+                    jobcard_id=result.id
+                )
+            )
+        ).all()
+
+        assert inventory_jobcard_link is not None
+        assert (
+            inventory_jobcard_link[0].quantity
+            == self.test_inventory_1._service_quantity
+        )
+
+        # Verify inventory quantity persists in inventory
+        db_inventory: Inventory | None = self.inventory_view.read_by_id(
+            db_session=self.session, record_id=self.test_inventory_1.id
+        )
+
+        assert db_inventory is not None
+        assert db_inventory.quantity == (self.test_inventory_1.quantity)
+
+    def test_update_jobcard_inventory_single_inventory(self) -> None:
+        """Updating a job card single inventory item."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+
         # Create job card
-        jobcard: JobCard = self.jobcard_view.create(
+        db_jobcard: JobCard = self.jobcard_view.create(
             db_session=self.session,
             record=JobCard(
                 **self.test_jobcard_1.model_dump(),
+                inventories=[self.test_inventory_1],
+            ),
+        )
+
+        updated_jobcard: JobCardBase = JobCardBase(
+            status=ServiceStatus.IN_PROGRESS,
+            service_date=date.today() + timedelta(days=1),
+            description="Updated Test Job Card",
+            vehicle_id=self.test_vehicle_1.id,
+        )
+        self.test_inventory_1._service_quantity = 20
+
+        # Update inventory
+        result: JobCard | None = self.jobcard_view.update_by_id(
+            db_session=self.session,
+            record_id=db_jobcard.id,
+            record=JobCard(
+                **updated_jobcard.model_dump(),
+                inventories=[self.test_inventory_1],
+            ),
+        )
+
+        assert result is not None
+        assert result.created_at is not None
+        assert result.updated_at is not None
+        assert (
+            result.model_dump(exclude={"id", "created_at", "updated_at"})
+            == updated_jobcard.model_dump()
+        )
+        assert len(result.inventories) == 1
+        assert self.test_inventory_1 in result.inventories
+
+        # Verify inventory quantity in inventory-jobcard links
+        inventory_jobcard_link: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter_by(
+                    jobcard_id=result.id
+                )
+            )
+        ).all()
+
+        assert inventory_jobcard_link is not None
+        assert (
+            inventory_jobcard_link[0].quantity
+            == self.test_inventory_1._service_quantity
+        )
+
+        # Verify inventory quantity persists in inventory
+        db_inventory: Inventory | None = self.inventory_view.read_by_id(
+            db_session=self.session, record_id=self.test_inventory_1.id
+        )
+
+        assert db_inventory is not None
+        assert db_inventory.quantity == (self.test_inventory_1.quantity)
+
+    def test_update_jobcard_add_inventory(self) -> None:
+        """Updating a job card by adding inventory item."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+
+        # Create job card
+        db_jobcard: JobCard = self.jobcard_view.create(
+            db_session=self.session,
+            record=JobCard(
+                **self.test_jobcard_1.model_dump(),
+                inventories=[self.test_inventory_1],
+            ),
+        )
+
+        updated_jobcard: JobCardBase = JobCardBase(
+            status=ServiceStatus.IN_PROGRESS,
+            service_date=date.today() + timedelta(days=1),
+            description="Updated Test Job Card",
+            vehicle_id=self.test_vehicle_1.id,
+        )
+        self.test_inventory_2._service_quantity = 20
+
+        # Update inventory
+        result: JobCard | None = self.jobcard_view.update_by_id(
+            db_session=self.session,
+            record_id=db_jobcard.id,
+            record=JobCard(
+                **updated_jobcard.model_dump(),
                 inventories=[self.test_inventory_1, self.test_inventory_2],
             ),
         )
 
-        # Update inventory
-        result: JobCard | None = self.jobcard_view.update_inventory(
+        assert result is not None
+        assert result.created_at is not None
+        assert result.updated_at is not None
+        assert (
+            result.model_dump(exclude={"id", "created_at", "updated_at"})
+            == updated_jobcard.model_dump()
+        )
+        assert len(result.inventories) == 2
+        assert self.test_inventory_1 in result.inventories
+        assert self.test_inventory_2 in result.inventories
+
+        # Verify inventory quantity in inventory-jobcard links
+        inventory_jobcard_links: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter_by(
+                    jobcard_id=result.id
+                )
+            )
+        ).all()
+
+        assert inventory_jobcard_links is not None
+        assert all(
+            link.quantity == inventory._service_quantity
+            for link, inventory in zip(
+                sorted(inventory_jobcard_links, key=lambda x: x.inventory_id),
+                sorted(
+                    [self.test_inventory_1, self.test_inventory_2],
+                    key=lambda x: x.id,
+                ),
+                strict=True,
+            )
+        )
+
+        # Verify inventories quantity persists in inventory
+        db_inventories: Sequence[Inventory] = (
+            self.inventory_view.read_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[i.id for i in result.inventories],
+            )
+        )
+
+        assert db_inventories is not None
+        assert all(
+            db_inventory.quantity == (inventory.quantity)
+            for db_inventory, inventory in zip(
+                db_inventories, result.inventories, strict=True
+            )
+        )
+
+    def test_update_jobcard_remove_inventory(self) -> None:
+        """Updating a job card by removing inventory item."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+        self.test_inventory_2._service_quantity = 20
+
+        # Create job card
+        db_jobcard: JobCard = self.jobcard_view.create(
             db_session=self.session,
-            record_id=jobcard.id,
-            previous_inventory_id=self.test_inventory_1.id,
-            new_inventory_id=self.test_inventory_3.id,
+            record=JobCard(
+                **self.test_jobcard_2.model_dump(),
+                inventories=[self.test_inventory_1, self.test_inventory_2],
+            ),
+        )
+
+        updated_jobcard: JobCardBase = JobCardBase(
+            status=ServiceStatus.IN_PROGRESS,
+            service_date=date.today() + timedelta(days=1),
+            description="Updated Test Job Card",
+            vehicle_id=self.test_vehicle_1.id,
+        )
+
+        # Update inventory
+        result: JobCard | None = self.jobcard_view.update_by_id(
+            db_session=self.session,
+            record_id=db_jobcard.id,
+            record=JobCard(
+                **updated_jobcard.model_dump(),
+                inventories=[self.test_inventory_1],
+            ),
         )
 
         assert result is not None
-        assert result.id == jobcard.id
-        assert len(result.inventories) == 2
-        assert self.test_inventory_2 in result.inventories
-        assert self.test_inventory_3 in result.inventories
-        assert self.test_inventory_1 not in result.inventories
+        assert result.created_at is not None
+        assert result.updated_at is not None
+        assert (
+            result.model_dump(exclude={"id", "created_at", "updated_at"})
+            == updated_jobcard.model_dump()
+        )
+        assert len(result.inventories) == 1
+        assert self.test_inventory_1 in result.inventories
+        assert self.test_inventory_2 not in result.inventories
 
-    def test_update_jobcard_inventory_with_non_existent_jobcard(self) -> None:
-        """Updating a non-existent job card with inventory item."""
+        # Verify inventory quantity in inventory-jobcard links
+        inventory_jobcard_links: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter_by(
+                    jobcard_id=result.id
+                )
+            )
+        ).all()
+
+        assert inventory_jobcard_links is not None
+        assert all(
+            link.quantity == inventory._service_quantity
+            for link, inventory in zip(
+                sorted(inventory_jobcard_links, key=lambda x: x.inventory_id),
+                sorted([self.test_inventory_1], key=lambda x: x.id),
+                strict=True,
+            )
+        )
+
+        # Verify inventories quantity persists in inventory
+        db_inventories: Sequence[Inventory] = (
+            self.inventory_view.read_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[i.id for i in result.inventories],
+            )
+        )
+
+        assert db_inventories is not None
+        assert all(
+            db_inventory.quantity == (inventory.quantity)
+            for db_inventory, inventory in zip(
+                db_inventories, result.inventories, strict=True
+            )
+        )
+
+    def test_update_jobcard_non_existent_inventory(self) -> None:
+        """Updating a job card with non-existent inventory item."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+
+        # Create job card
+        db_jobcard: JobCard = self.jobcard_view.create(
+            db_session=self.session,
+            record=JobCard(
+                **self.test_jobcard_1.model_dump(),
+                inventories=[self.test_inventory_1],
+            ),
+        )
+
+        updated_jobcard: JobCardBase = JobCardBase(
+            status=ServiceStatus.IN_PROGRESS,
+            service_date=date.today() + timedelta(days=1),
+            description="Updated Test Job Card",
+            vehicle_id=self.test_vehicle_1.id,
+        )
+
+        inventory_id: int = -1
+
+        with pytest.raises(expected_exception=ValueError) as exc_info:
+            self.jobcard_view.update_by_id(
+                db_session=self.session,
+                record_id=db_jobcard.id,
+                record=JobCard(
+                    **updated_jobcard.model_dump(),
+                    inventories=[Inventory(id=inventory_id)],  # type: ignore
+                ),
+            )
+
+        assert f"Inventory with id {inventory_id} not found" in str(
+            exc_info.value
+        )
+
+    def test_update_jobcard_multiple_inventories(self) -> None:
+        """Updating a job card multiple inventory items."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+        self.test_inventory_2._service_quantity = 20
+
+        # Create job card
+        db_jobcard: JobCard = self.jobcard_view.create(
+            db_session=self.session,
+            record=JobCard(
+                **self.test_jobcard_2.model_dump(),
+                inventories=[self.test_inventory_1, self.test_inventory_2],
+            ),
+        )
+
+        updated_jobcard: JobCardBase = JobCardBase(
+            status=ServiceStatus.IN_PROGRESS,
+            service_date=date.today() + timedelta(days=1),
+            description="Updated Test Job Card",
+            vehicle_id=self.test_vehicle_1.id,
+        )
+        self.test_inventory_1._service_quantity = 20
+        self.test_inventory_2._service_quantity = 30
+
+        # Update inventory
+        result: JobCard | None = self.jobcard_view.update_by_id(
+            db_session=self.session,
+            record_id=db_jobcard.id,
+            record=JobCard(
+                **updated_jobcard.model_dump(),
+                inventories=[self.test_inventory_1, self.test_inventory_2],
+            ),
+        )
+
+        assert result is not None
+        assert result.created_at is not None
+        assert result.updated_at is not None
+        assert (
+            result.model_dump(exclude={"id", "created_at", "updated_at"})
+            == updated_jobcard.model_dump()
+        )
+        assert len(result.inventories) == 2
+        assert self.test_inventory_1 in result.inventories
+        assert self.test_inventory_2 in result.inventories
+
+        # Verify inventory quantity in inventory-jobcard links
+        inventory_jobcard_links: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter_by(
+                    jobcard_id=result.id
+                )
+            )
+        ).all()
+
+        assert inventory_jobcard_links is not None
+        assert all(
+            link.quantity == inventory._service_quantity
+            for link, inventory in zip(
+                sorted(inventory_jobcard_links, key=lambda x: x.inventory_id),
+                sorted(
+                    [self.test_inventory_1, self.test_inventory_2],
+                    key=lambda x: x.id,
+                ),
+                strict=True,
+            )
+        )
+
+        # Verify inventories quantity persists in inventory
+        db_inventories: Sequence[Inventory] = (
+            self.inventory_view.read_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[i.id for i in result.inventories],
+            )
+        )
+
+        assert db_inventories is not None
+        assert all(
+            db_inventory.quantity == (inventory.quantity)
+            for db_inventory, inventory in zip(
+                db_inventories, result.inventories, strict=True
+            )
+        )
+
+    def test_update_jobcard_inventory_quantity_exceeds_available_quantity(
+        self,
+    ) -> None:
+        """Updating a job card required quantity exceeds available quantity."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+        self.test_inventory_2._service_quantity = 20
+
+        # Create job card
+        db_jobcard: JobCard = self.jobcard_view.create(
+            db_session=self.session,
+            record=JobCard(
+                **self.test_jobcard_2.model_dump(),
+                inventories=[self.test_inventory_1, self.test_inventory_2],
+            ),
+        )
+
+        updated_jobcard: JobCardBase = JobCardBase(
+            status=ServiceStatus.IN_PROGRESS,
+            service_date=date.today() + timedelta(days=1),
+            description="Updated Test Job Card",
+            vehicle_id=self.test_vehicle_1.id,
+        )
+        self.test_inventory_2._service_quantity = 200
+
+        with pytest.raises(expected_exception=ValueError) as exc_info:
+            self.jobcard_view.update_by_id(
+                db_session=self.session,
+                record_id=db_jobcard.id,
+                record=JobCard(
+                    **updated_jobcard.model_dump(),
+                    inventories=[self.test_inventory_1, self.test_inventory_2],
+                ),
+            )
+
+        assert (
+            f"Insufficient quantity for {self.test_inventory_2.item_name}. "
+            f"Required: {self.test_inventory_2._service_quantity}, "
+            f"Available: {self.test_inventory_2.quantity}"
+            in str(exc_info.value)
+        )
+
+    def test_update_jobcard_inventory_quantity_exceeds_inventory_threshold(
+        self,
+    ) -> None:
+        """Updating job card inventory quantity exceeds inventory threshold."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+        self.test_inventory_2._service_quantity = 20
+
+        # Create job card
+        db_jobcard: JobCard = self.jobcard_view.create(
+            db_session=self.session,
+            record=JobCard(
+                **self.test_jobcard_2.model_dump(),
+                inventories=[self.test_inventory_1, self.test_inventory_2],
+            ),
+        )
+
+        updated_jobcard: JobCardBase = JobCardBase(
+            status=ServiceStatus.IN_PROGRESS,
+            service_date=date.today() + timedelta(days=1),
+            description="Updated Test Job Card",
+            vehicle_id=self.test_vehicle_1.id,
+        )
+        self.test_inventory_2._service_quantity = 1000
+
+        with pytest.raises(expected_exception=ValueError) as exc_info:
+            self.jobcard_view.update_by_id(
+                db_session=self.session,
+                record_id=db_jobcard.id,
+                record=JobCard(
+                    **updated_jobcard.model_dump(),
+                    inventories=[self.test_inventory_1, self.test_inventory_2],
+                ),
+            )
+
+        assert (
+            f"Insufficient quantity for {self.test_inventory_2.item_name}. "
+            f"Required: {self.test_inventory_2._service_quantity}, "
+            f"Available: {self.test_inventory_2.quantity}"
+            in str(exc_info.value)
+        )
+
+    def test_update_non_existent_jobcard(self) -> None:
+        """Updating a non-existent job card."""
         non_existent_id: int = -1
 
-        # Update inventory
-        result: JobCard | None = self.jobcard_view.update_inventory(
+        updated_jobcard: JobCardBase = JobCardBase(
+            status=ServiceStatus.IN_PROGRESS,
+            service_date=date.today() + timedelta(days=1),
+            description="Updated Test Job Card",
+            vehicle_id=self.test_vehicle_1.id,
+        )
+
+        result: JobCard | None = self.jobcard_view.update_by_id(
             db_session=self.session,
             record_id=non_existent_id,
-            previous_inventory_id=self.test_inventory_1.id,
-            new_inventory_id=self.test_inventory_2.id,
+            record=JobCard(**updated_jobcard.model_dump()),
         )
 
         assert result is None
 
-    def test_update_jobcard_inventory_with_non_existent_previous_inventory(
-        self,
-    ) -> None:
-        """Updating a job card with non-existent inventory item."""
+    def test_update_jobcard_no_inventory(self) -> None:
+        """Updating a job card without inventory."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+
         # Create job card
-        jobcard: JobCard = self.jobcard_view.create(
+        db_jobcard: JobCard = self.jobcard_view.create(
             db_session=self.session,
             record=JobCard(
                 **self.test_jobcard_1.model_dump(),
@@ -696,97 +1399,30 @@ class TestJobCard(TestSetup):
             ),
         )
 
-        non_existent_inventory_id: int = -1
-
-        # Update inventory
-        result: JobCard | None = self.jobcard_view.update_inventory(
-            db_session=self.session,
-            record_id=jobcard.id,
-            previous_inventory_id=non_existent_inventory_id,
-            new_inventory_id=self.test_inventory_2.id,
+        updated_jobcard: JobCardBase = JobCardBase(
+            status=ServiceStatus.IN_PROGRESS,
+            service_date=date.today() + timedelta(days=1),
+            description="Updated Test Job Card",
+            vehicle_id=self.test_vehicle_1.id,
         )
 
-        assert result is None
+        with pytest.raises(expected_exception=ValueError) as exc_info:
+            self.jobcard_view.update_by_id(
+                db_session=self.session,
+                record_id=db_jobcard.id,
+                record=JobCard(**updated_jobcard.model_dump()),
+            )
 
-        # Verify original inventory relationship remains unchanged
-        db_record: JobCard | None = self.jobcard_view.read_by_id(
-            db_session=self.session, record_id=jobcard.id
-        )
+        assert "At least one inventory item is required" in str(exc_info.value)
 
-        assert db_record is not None
-        assert len(db_record.inventories) == 1
-        assert self.test_inventory_1 in db_record.inventories
+    def test_update_multiple_jobcards(self) -> None:
+        """Updating multiple job cards."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+        self.test_inventory_2._service_quantity = 20
 
-    def test_update_jobcard_inventory_with_non_existent_new_inventory(
-        self,
-    ) -> None:
-        """Updating a job card with non-existent new inventory item."""
-        # Create job card
-        jobcard: JobCard = self.jobcard_view.create(
-            db_session=self.session,
-            record=JobCard(
-                **self.test_jobcard_1.model_dump(),
-                inventories=[self.test_inventory_1],
-            ),
-        )
-
-        non_existent_inventory_id: int = -1
-
-        # Update inventory
-        result: JobCard | None = self.jobcard_view.update_inventory(
-            db_session=self.session,
-            record_id=jobcard.id,
-            previous_inventory_id=self.test_inventory_1.id,
-            new_inventory_id=non_existent_inventory_id,
-        )
-
-        assert result is None
-
-        # Verify original inventory relationship remains unchanged
-        db_record: JobCard | None = self.jobcard_view.read_by_id(
-            db_session=self.session, record_id=jobcard.id
-        )
-
-        assert db_record is not None
-        assert len(db_record.inventories) == 1
-        assert self.test_inventory_1 in db_record.inventories
-
-    def test_update_jobcard_inventory_with_wrong_previous_inventory(
-        self,
-    ) -> None:
-        """Updating a job card with wrong previous inventory item."""
-        # Create job card
-        jobcard: JobCard = self.jobcard_view.create(
-            db_session=self.session,
-            record=JobCard(
-                **self.test_jobcard_1.model_dump(),
-                inventories=[self.test_inventory_1],
-            ),
-        )
-
-        # Update inventory
-        result: JobCard | None = self.jobcard_view.update_inventory(
-            db_session=self.session,
-            record_id=jobcard.id,
-            previous_inventory_id=self.test_inventory_2.id,
-            new_inventory_id=self.test_inventory_2.id,
-        )
-
-        assert result is None
-
-        # Verify original inventory relationship remains unchanged
-        db_record: JobCard | None = self.jobcard_view.read_by_id(
-            db_session=self.session, record_id=jobcard.id
-        )
-
-        assert db_record is not None
-        assert len(db_record.inventories) == 1
-        assert self.test_inventory_1 in db_record.inventories
-
-    def test_update_multiple_jobcards_by_ids(self) -> None:
-        """Updating multiple job cards by IDs."""
         # Create multiple job cards
-        jobcards: Sequence[JobCard] = self.jobcard_view.create_multiple(
+        result: Sequence[JobCard] = self.jobcard_view.create_multiple(
             db_session=self.session,
             records=[
                 JobCard(
@@ -800,44 +1436,98 @@ class TestJobCard(TestSetup):
             ],
         )
 
-        updated_jobcard_1: JobCardBase = JobCardBase(
-            status=ServiceStatus.IN_PROGRESS,
-            service_date=date.today() + timedelta(days=1),
-            description="Updated Test Job Card 1",
-            vehicle_id=self.test_vehicle_1.id,
-        )
-        updated_jobcard_2: JobCardBase = JobCardBase(
-            status=ServiceStatus.COMPLETED,
-            service_date=date.today() + timedelta(days=2),
-            description="Updated Test Job Card 2",
-            vehicle_id=self.test_vehicle_2.id,
-        )
+        updated_jobcards: Sequence[JobCardBase] = [
+            JobCardBase(
+                status=ServiceStatus.IN_PROGRESS,
+                service_date=date.today() + timedelta(days=1),
+                description="Updated Test Job Card",
+                vehicle_id=self.test_vehicle_1.id,
+            )
+            for _ in result
+        ]
 
         # Update multiple job cards
-        updated_jobcards: Sequence[JobCard] = (
+        updated_result: Sequence[JobCard] = (
             self.jobcard_view.update_multiple_by_ids(
                 db_session=self.session,
-                record_ids=[j.id for j in jobcards],
                 records=[
-                    JobCard(**updated_jobcard_1.model_dump()),
-                    JobCard(**updated_jobcard_2.model_dump()),
+                    JobCard(
+                        **updated_jobcard.model_dump(),
+                        inventories=[self.test_inventory_1],
+                    )
+                    for updated_jobcard in updated_jobcards
+                ],
+                record_ids=[j.id for j in result],
+            )
+        )
+
+        assert len(updated_result) == len(result)
+        assert all(j.created_at is not None for j in updated_result)
+        assert all(j.updated_at is not None for j in updated_result)
+        assert all(j.updated_at is not None for j in updated_result)
+        assert all(
+            j.model_dump(exclude={"id", "created_at", "updated_at"})
+            == u.model_dump()
+            for j, u in zip(updated_result, updated_jobcards, strict=False)
+        )
+        assert all(len(j.inventories) == 1 for j in updated_result)
+        assert all(
+            j.inventories[0] == result[idx].inventories[0]
+            for idx, j in enumerate(updated_result)
+        )
+
+        # Verify inventory quantity in inventory-jobcard links
+        inventory_jobcard_links: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter(
+                    col(column_expression=InventoryJobCardLink.jobcard_id).in_(
+                        [jobcard.id for jobcard in result]
+                    )
+                )
+            )
+        ).all()
+
+        jobcard_inventory_quantity: dict[tuple[int, int], int] = {
+            (link.jobcard_id, link.inventory_id): link.quantity
+            for link in inventory_jobcard_links
+        }
+
+        assert inventory_jobcard_links is not None
+        assert len(inventory_jobcard_links) == 2
+        assert all(
+            jobcard_inventory_quantity[(jobcard.id, inventory.id)]
+            == inventory._service_quantity
+            for jobcard in updated_result
+            for inventory in jobcard.inventories
+        )
+
+        # Verify inventories quantity persists in inventory
+        db_inventories: Sequence[Inventory] = (
+            self.inventory_view.read_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[
+                    inventory.id
+                    for jobcard in result
+                    for inventory in jobcard.inventories
                 ],
             )
         )
 
-        # Verify job cards are updated
-        assert len(updated_jobcards) == 2
-        assert all(j.id is not None for j in updated_jobcards)
-        assert all(j.created_at is not None for j in updated_jobcards)
-        assert all(j.updated_at is not None for j in updated_jobcards)
+        assert db_inventories is not None
         assert all(
-            j.model_dump(exclude={"id", "created_at", "updated_at", "vehicle"})
-            in [updated_jobcard_1.model_dump(), updated_jobcard_2.model_dump()]
-            for j in updated_jobcards
+            db_inventory.quantity == (inventory.quantity)
+            for db_inventory, inventory in zip(
+                db_inventories,
+                [self.test_inventory_1, self.test_inventory_2],
+                strict=False,
+            )
         )
 
     def test_delete_jobcard(self) -> None:
         """Deleting a job card."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+
         # Create job card
         jobcard: JobCard = self.jobcard_view.create(
             db_session=self.session,
@@ -847,114 +1537,6 @@ class TestJobCard(TestSetup):
             ),
         )
 
-        result: Message | None = self.jobcard_view.delete_by_id(
-            db_session=self.session, record_id=jobcard.id
-        )
-
-        assert result is not None
-        assert result == Message(message="Record deleted successfully")
-
-        # Verify job card no longer exists
-        retrieved_jobcard: JobCard | None = self.jobcard_view.read_by_id(
-            db_session=self.session, record_id=jobcard.id
-        )
-
-        assert retrieved_jobcard is None
-
-    def test_delete_non_existent_jobcard(self) -> None:
-        """Deleting a non-existent job card."""
-        non_existent_id: int = -1
-
-        result: Message | None = self.jobcard_view.delete_by_id(
-            db_session=self.session, record_id=non_existent_id
-        )
-
-        assert result is None
-
-    def test_delete_multiple_jobcards_with_shared_inventory(self) -> None:
-        """Deleting multiple job cards with shared inventory."""
-        # Create job cards
-        jobcard_1: JobCard = self.jobcard_view.create(
-            db_session=self.session,
-            record=JobCard(
-                **self.test_jobcard_1.model_dump(),
-                inventories=[self.test_inventory_1],
-            ),
-        )
-        jobcard_2: JobCard = self.jobcard_view.create(
-            db_session=self.session,
-            record=JobCard(
-                **self.test_jobcard_2.model_dump(),
-                inventories=[self.test_inventory_1],
-            ),
-        )
-
-        # Delete first job card
-        result_1: Message | None = self.jobcard_view.delete_by_id(
-            db_session=self.session, record_id=jobcard_1.id
-        )
-
-        assert result_1 is not None
-        assert result_1 == Message(message="Record deleted successfully")
-
-        # Verify first job card no longer exists
-        retrieved_jobcard_1: JobCard | None = self.jobcard_view.read_by_id(
-            db_session=self.session, record_id=jobcard_1.id
-        )
-
-        assert retrieved_jobcard_1 is None
-
-        # Verify second job card still exists
-        retrieved_jobcard_2: JobCard | None = self.jobcard_view.read_by_id(
-            db_session=self.session, record_id=jobcard_2.id
-        )
-
-        assert retrieved_jobcard_2 is not None
-        assert retrieved_jobcard_2.id == jobcard_2.id
-
-        # Verify inventory still exists
-        inventory: Inventory | None = self.inventory_view.read_by_id(
-            db_session=self.session, record_id=self.test_inventory_1.id
-        )
-
-        assert inventory is not None
-        assert inventory.id == self.test_inventory_1.id
-
-        # Delete second job card
-        result_2: Message | None = self.jobcard_view.delete_by_id(
-            db_session=self.session, record_id=jobcard_2.id
-        )
-
-        assert result_2 is not None
-        assert result_2 == Message(message="Record deleted successfully")
-
-        # Verify second job card no longer exists
-        retrieved_jobcard2: JobCard | None = self.jobcard_view.read_by_id(
-            db_session=self.session, record_id=jobcard_2.id
-        )
-
-        assert retrieved_jobcard2 is None
-
-        # Verify inventory still exists
-        retrieved_inventory: Inventory | None = self.inventory_view.read_by_id(
-            db_session=self.session, record_id=self.test_inventory_1.id
-        )
-
-        assert retrieved_inventory is not None
-        assert retrieved_inventory.id == self.test_inventory_1.id
-
-    def test_delete_jobcard_verify_inventory_links_deleted(self) -> None:
-        """Verifying inventory links are deleted on job card delete."""
-        # Create job card
-        jobcard: JobCard = self.jobcard_view.create(
-            db_session=self.session,
-            record=JobCard(
-                **self.test_jobcard_1.model_dump(),
-                inventories=[self.test_inventory_1],
-            ),
-        )
-
-        # Delete job card
         result: Message | None = self.jobcard_view.delete_by_id(
             db_session=self.session, record_id=jobcard.id
         )
@@ -970,16 +1552,32 @@ class TestJobCard(TestSetup):
         assert retrieved_jobcard is None
 
         # Verify inventory no longer linked to job card
-        inventory: Inventory | None = self.inventory_view.read_by_id(
-            db_session=self.session, record_id=self.test_inventory_1.id
+        inventory_jobcard_links: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter_by(
+                    jobcard_id=jobcard.id
+                )
+            )
+        ).all()
+
+        assert inventory_jobcard_links == []
+
+    def test_delete_non_existent_jobcard(self) -> None:
+        """Deleting a non-existent job card."""
+        non_existent_id: int = -1
+
+        result: Message | None = self.jobcard_view.delete_by_id(
+            db_session=self.session, record_id=non_existent_id
         )
 
-        assert inventory is not None
-        assert inventory.id == self.test_inventory_1.id
-        assert len(inventory.jobcards) == 0
+        assert result is None
 
     def test_delete_multiple_jobcards_by_ids(self) -> None:
         """Deleting multiple job cards by IDs."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+        self.test_inventory_2._service_quantity = 20
+
         # Create multiple job cards
         jobcards: Sequence[JobCard] = self.jobcard_view.create_multiple(
             db_session=self.session,
@@ -1010,6 +1608,19 @@ class TestJobCard(TestSetup):
         )
 
         assert len(retrieved_jobcards) == 0
+
+        # Verify inventory no longer linked to job card
+        inventory_jobcard_links: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter(
+                    col(column_expression=InventoryJobCardLink.jobcard_id).in_(
+                        [j.id for j in jobcards]
+                    )
+                )
+            )
+        ).all()
+
+        assert inventory_jobcard_links == []
 
         # Verify inventories still exist
         inventories: Sequence[Inventory] = (
