@@ -119,6 +119,6 @@ def date_validator(service_date: date) -> date:
 
     """
     if service_date < date.today():
-        raise ValueError("Date cannot be in the past.")
+        raise ValueError("Date cannot be in past.")
 
     return service_date

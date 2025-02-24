@@ -9,7 +9,6 @@ from collections.abc import Sequence
 
 from sqlmodel import Session, select
 
-from workshop_management_system.core.config import INVENTORY_MINIMUM_THRESHOLD
 from workshop_management_system.v1.inventory.model import Inventory
 from workshop_management_system.v1.inventory.view import InventoryView
 from workshop_management_system.v1.inventory_jobcard_link.model import (
@@ -116,10 +115,10 @@ class JobCardView(BaseView[JobCard]):
             if db_inventory is None:
                 raise ValueError(f"Inventory with id {inventory.id} not found")
 
-            if inventory.quantity < INVENTORY_MINIMUM_THRESHOLD:
+            if inventory.quantity < inventory.minimum_threshold:
                 raise ValueError(
                     f"Inventory {inventory.item_name} below minimum threshold "
-                    f"({INVENTORY_MINIMUM_THRESHOLD}). Please restock."
+                    f"({inventory.minimum_threshold}). Please restock."
                 )
 
             if inventory.quantity < required_quantity:
@@ -185,7 +184,7 @@ class JobCardView(BaseView[JobCard]):
     def create_multiple(
         self, db_session: Session, records: Sequence[JobCard]
     ) -> Sequence[JobCard]:
-        """Create multiple new jobcard in database.
+        """Create multiple new jobcards in database.
 
         :Args:
         - `db_session` (Session): SQLModel database session. **(Required)**
@@ -256,7 +255,7 @@ class JobCardView(BaseView[JobCard]):
         if not db_record:
             return None
 
-        # Always validate inventory presence
+        # Validate inventory presence
         self._validate_inventories(record=record)
 
         # Get inventory map and existing links
@@ -264,7 +263,7 @@ class JobCardView(BaseView[JobCard]):
             db_session=db_session, inventories=record.inventories
         )
 
-        # Get existing links for the job card
+        # Get existing links for job card
         links: Sequence[InventoryJobCardLink] = db_session.exec(
             statement=select(InventoryJobCardLink).where(
                 InventoryJobCardLink.jobcard_id == record_id

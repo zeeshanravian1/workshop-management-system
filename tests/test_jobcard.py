@@ -217,7 +217,7 @@ class TestJobCard(TestSetup):
             exc_info.value
         )
 
-        # Check if date is in the past
+        # Check if date is in past
         with pytest.raises(expected_exception=ValidationError) as exc_info:
             JobCardBase(
                 status=ServiceStatus.PENDING,
@@ -226,11 +226,12 @@ class TestJobCard(TestSetup):
                 vehicle_id=self.test_vehicle_1.id,
             )
 
-        assert "Date cannot be in the past." in str(exc_info.value)
+        assert "Date cannot be in past." in str(exc_info.value)
 
     def test_create_jobcard_single_inventory(self) -> None:
         """Creating a job card single inventory item."""
         # Set inventory quantity
+        initial_quantity: int = self.test_inventory_1.quantity
         self.test_inventory_1._service_quantity = 10
 
         # Create job card
@@ -273,11 +274,13 @@ class TestJobCard(TestSetup):
         )
 
         assert db_inventory is not None
-        assert db_inventory.quantity == (self.test_inventory_1.quantity)
+        assert db_inventory.quantity == initial_quantity
 
     def test_create_jobcard_multiple_inventories(self) -> None:
         """Creating a job card multiple inventory items."""
         # Set inventory quantity
+        initial_quantity_1: int = self.test_inventory_1.quantity
+        initial_quantity_2: int = self.test_inventory_2.quantity
         self.test_inventory_1._service_quantity = 10
         self.test_inventory_2._service_quantity = 20
 
@@ -332,10 +335,13 @@ class TestJobCard(TestSetup):
         )
 
         assert db_inventories is not None
+        assert len(db_inventories) == 2
         assert all(
-            db_inventory.quantity == (inventory.quantity)
-            for db_inventory, inventory in zip(
-                db_inventories, result.inventories, strict=True
+            db_inventory.quantity == quantity
+            for db_inventory, quantity in zip(
+                sorted(db_inventories, key=lambda x: x.id),
+                [initial_quantity_1, initial_quantity_2],
+                strict=True,
             )
         )
 
@@ -400,6 +406,8 @@ class TestJobCard(TestSetup):
     def test_create_multiple_jobcards(self) -> None:
         """Test creating multiple job cards inventory relationships."""
         # Set different inventory quantities for each job card
+        initial_quantity_1: int = self.test_inventory_1.quantity
+        initial_quantity_2: int = self.test_inventory_2.quantity
         self.test_inventory_1._service_quantity = 10
         self.test_inventory_2._service_quantity = 20
 
@@ -470,18 +478,21 @@ class TestJobCard(TestSetup):
         )
 
         assert db_inventories is not None
+        assert len(db_inventories) == 2
         assert all(
-            db_inventory.quantity == (inventory.quantity)
-            for db_inventory, inventory in zip(
-                db_inventories,
-                [self.test_inventory_1, self.test_inventory_2],
-                strict=False,
+            db_inventory.quantity == quantity
+            for db_inventory, quantity in zip(
+                sorted(db_inventories, key=lambda x: x.id),
+                [initial_quantity_1, initial_quantity_2],
+                strict=True,
             )
         )
 
     def test_create_multiple_jobcards_different_quantities(self) -> None:
         """Test creating multiple job cards different inventory quantities."""
         # Set different inventory quantities for each job card
+        initial_quantity_1: int = self.test_inventory_1.quantity
+        initial_quantity_2: int = self.test_inventory_2.quantity
         self.test_inventory_1._service_quantity = 10
         self.test_inventory_2._service_quantity = 20
 
@@ -581,17 +592,18 @@ class TestJobCard(TestSetup):
         assert db_inventories is not None
         assert len(db_inventories) == 2
         assert all(
-            db_inventory.quantity == (inventory.quantity)
-            for db_inventory, inventory in zip(
-                db_inventories,
-                [self.test_inventory_1, self.test_inventory_2],
-                strict=False,
+            db_inventory.quantity == quantity
+            for db_inventory, quantity in zip(
+                sorted(db_inventories, key=lambda x: x.id),
+                [initial_quantity_1, initial_quantity_2],
+                strict=True,
             )
         )
 
     def test_read_jobcard_by_id_single_inventory(self) -> None:
         """Retrieving a job card by ID single inventory item."""
         # Set inventory quantity
+        initial_quantity: int = self.test_inventory_1.quantity
         self.test_inventory_1._service_quantity = 10
 
         # Create job card
@@ -613,9 +625,34 @@ class TestJobCard(TestSetup):
         assert len(result.inventories) == 1
         assert self.test_inventory_1 in result.inventories
 
+        # Verify inventory quantity in inventory-jobcard links
+        inventory_jobcard_link: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter_by(
+                    jobcard_id=result.id
+                )
+            )
+        ).all()
+
+        assert inventory_jobcard_link is not None
+        assert (
+            inventory_jobcard_link[0].quantity
+            == self.test_inventory_1._service_quantity
+        )
+
+        # Verify inventory quantity persists in inventory
+        db_inventory: Inventory | None = self.inventory_view.read_by_id(
+            db_session=self.session, record_id=self.test_inventory_1.id
+        )
+
+        assert db_inventory is not None
+        assert db_inventory.quantity == initial_quantity
+
     def test_read_jobcard_by_id_multiple_inventories(self) -> None:
         """Retrieving a job card by ID multiple inventory items."""
         # Set inventory quantity
+        initial_quantity_1: int = self.test_inventory_1.quantity
+        initial_quantity_2: int = self.test_inventory_2.quantity
         self.test_inventory_1._service_quantity = 10
         self.test_inventory_2._service_quantity = 20
 
@@ -639,6 +676,47 @@ class TestJobCard(TestSetup):
         assert self.test_inventory_1 in result.inventories
         assert self.test_inventory_2 in result.inventories
 
+        # Verify inventory quantity in inventory-jobcard links
+        inventory_jobcard_links: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter_by(
+                    jobcard_id=result.id
+                )
+            )
+        ).all()
+
+        assert inventory_jobcard_links is not None
+        assert all(
+            link.quantity == inventory._service_quantity
+            for link, inventory in zip(
+                sorted(inventory_jobcard_links, key=lambda x: x.inventory_id),
+                sorted(
+                    [self.test_inventory_1, self.test_inventory_2],
+                    key=lambda x: x.id,
+                ),
+                strict=True,
+            )
+        )
+
+        # Verify inventories quantity persists in inventory
+        db_inventories: Sequence[Inventory] = (
+            self.inventory_view.read_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[i.id for i in result.inventories],
+            )
+        )
+
+        assert db_inventories is not None
+        assert len(db_inventories) == 2
+        assert all(
+            db_inventory.quantity == quantity
+            for db_inventory, quantity in zip(
+                sorted(db_inventories, key=lambda x: x.id),
+                [initial_quantity_1, initial_quantity_2],
+                strict=True,
+            )
+        )
+
     def test_read_non_existent_jobcard(self) -> None:
         """Retrieving a non-existent job card."""
         non_existent_id: int = -1
@@ -653,6 +731,8 @@ class TestJobCard(TestSetup):
     def test_read_multiple_jobcards_by_ids(self) -> None:
         """Retrieving multiple job cards by IDs."""
         # Set inventory quantity
+        initial_quantity_1: int = self.test_inventory_1.quantity
+        initial_quantity_2: int = self.test_inventory_2.quantity
         self.test_inventory_1._service_quantity = 10
         self.test_inventory_2._service_quantity = 20
 
@@ -689,6 +769,52 @@ class TestJobCard(TestSetup):
                 retrieved_jobcards,
                 [self.test_inventory_1, self.test_inventory_2],
                 strict=False,
+            )
+        )
+
+        # Verify inventory quantity in inventory-jobcard links
+        inventory_jobcard_links: Sequence[InventoryJobCardLink] = (
+            self.session.exec(
+                statement=select(InventoryJobCardLink).filter(
+                    col(column_expression=InventoryJobCardLink.jobcard_id).in_(
+                        [jobcard.id for jobcard in retrieved_jobcards]
+                    )
+                )
+            )
+        ).all()
+
+        jobcard_inventory_quantity: dict[tuple[int, int], int] = {
+            (link.jobcard_id, link.inventory_id): link.quantity
+            for link in inventory_jobcard_links
+        }
+
+        assert inventory_jobcard_links is not None
+        assert len(inventory_jobcard_links) == 2
+        assert all(
+            jobcard_inventory_quantity[(jobcard.id, inventory.id)]
+            == inventory._service_quantity
+            for jobcard in retrieved_jobcards
+            for inventory in jobcard.inventories
+        )
+
+        # Verify inventories quantity persists in inventory
+        db_inventories: Sequence[Inventory] = (
+            self.inventory_view.read_multiple_by_ids(
+                db_session=self.session,
+                record_ids=[
+                    i.id for j in retrieved_jobcards for i in j.inventories
+                ],
+            )
+        )
+
+        assert db_inventories is not None
+        assert len(db_inventories) == 2
+        assert all(
+            db_inventory.quantity == quantity
+            for db_inventory, quantity in zip(
+                sorted(db_inventories, key=lambda x: x.id),
+                [initial_quantity_1, initial_quantity_2],
+                strict=True,
             )
         )
 
@@ -877,6 +1003,7 @@ class TestJobCard(TestSetup):
     def test_update_jobcard(self) -> None:
         """Updating a job card."""
         # Set inventory quantity
+        initial_quantity: int = self.test_inventory_1.quantity
         self.test_inventory_1._service_quantity = 10
 
         # Create job card
@@ -936,11 +1063,12 @@ class TestJobCard(TestSetup):
         )
 
         assert db_inventory is not None
-        assert db_inventory.quantity == (self.test_inventory_1.quantity)
+        assert db_inventory.quantity == initial_quantity
 
     def test_update_jobcard_inventory_single_inventory(self) -> None:
         """Updating a job card single inventory item."""
         # Set inventory quantity
+        initial_quantity: int = self.test_inventory_1.quantity
         self.test_inventory_1._service_quantity = 10
 
         # Create job card
@@ -1001,11 +1129,12 @@ class TestJobCard(TestSetup):
         )
 
         assert db_inventory is not None
-        assert db_inventory.quantity == (self.test_inventory_1.quantity)
+        assert db_inventory.quantity == initial_quantity
 
     def test_update_jobcard_add_inventory(self) -> None:
         """Updating a job card by adding inventory item."""
         # Set inventory quantity
+        initial_quantity_1: int = self.test_inventory_1.quantity
         self.test_inventory_1._service_quantity = 10
 
         # Create job card
@@ -1023,6 +1152,7 @@ class TestJobCard(TestSetup):
             description="Updated Test Job Card",
             vehicle_id=self.test_vehicle_1.id,
         )
+        initial_quantity_2: int = self.test_inventory_2.quantity
         self.test_inventory_2._service_quantity = 20
 
         # Update inventory
@@ -1077,16 +1207,20 @@ class TestJobCard(TestSetup):
         )
 
         assert db_inventories is not None
+        assert len(db_inventories) == 2
         assert all(
-            db_inventory.quantity == (inventory.quantity)
-            for db_inventory, inventory in zip(
-                db_inventories, result.inventories, strict=True
+            db_inventory.quantity == quantity
+            for db_inventory, quantity in zip(
+                sorted(db_inventories, key=lambda x: x.id),
+                [initial_quantity_1, initial_quantity_2],
+                strict=True,
             )
         )
 
     def test_update_jobcard_remove_inventory(self) -> None:
         """Updating a job card by removing inventory item."""
         # Set inventory quantity
+        initial_quantity: int = self.test_inventory_1.quantity
         self.test_inventory_1._service_quantity = 10
         self.test_inventory_2._service_quantity = 20
 
@@ -1155,10 +1289,13 @@ class TestJobCard(TestSetup):
         )
 
         assert db_inventories is not None
+        assert len(db_inventories) == 1
         assert all(
-            db_inventory.quantity == (inventory.quantity)
-            for db_inventory, inventory in zip(
-                db_inventories, result.inventories, strict=True
+            db_inventory.quantity == quantity
+            for db_inventory, quantity in zip(
+                sorted(db_inventories, key=lambda x: x.id),
+                [initial_quantity],
+                strict=True,
             )
         )
 
@@ -1202,6 +1339,8 @@ class TestJobCard(TestSetup):
     def test_update_jobcard_multiple_inventories(self) -> None:
         """Updating a job card multiple inventory items."""
         # Set inventory quantity
+        initial_quantity_1: int = self.test_inventory_1.quantity
+        initial_quantity_2: int = self.test_inventory_2.quantity
         self.test_inventory_1._service_quantity = 10
         self.test_inventory_2._service_quantity = 20
 
@@ -1275,10 +1414,13 @@ class TestJobCard(TestSetup):
         )
 
         assert db_inventories is not None
+        assert len(db_inventories) == 2
         assert all(
-            db_inventory.quantity == (inventory.quantity)
-            for db_inventory, inventory in zip(
-                db_inventories, result.inventories, strict=True
+            db_inventory.quantity == quantity
+            for db_inventory, quantity in zip(
+                sorted(db_inventories, key=lambda x: x.id),
+                [initial_quantity_1, initial_quantity_2],
+                strict=True,
             )
         )
 
@@ -1418,6 +1560,7 @@ class TestJobCard(TestSetup):
     def test_update_multiple_jobcards(self) -> None:
         """Updating multiple job cards."""
         # Set inventory quantity
+        initial_quantity_1: int = self.test_inventory_1.quantity
         self.test_inventory_1._service_quantity = 10
         self.test_inventory_2._service_quantity = 20
 
@@ -1514,12 +1657,13 @@ class TestJobCard(TestSetup):
         )
 
         assert db_inventories is not None
+        assert len(db_inventories) == 1
         assert all(
-            db_inventory.quantity == (inventory.quantity)
-            for db_inventory, inventory in zip(
-                db_inventories,
-                [self.test_inventory_1, self.test_inventory_2],
-                strict=False,
+            db_inventory.quantity == quantity
+            for db_inventory, quantity in zip(
+                sorted(db_inventories, key=lambda x: x.id),
+                [initial_quantity_1],
+                strict=True,
             )
         )
 

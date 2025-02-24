@@ -279,7 +279,7 @@ class BaseView(Generic[Model]):
         - `record_id` (UUID | int): ID of record to delete. **(Required)**
 
         :Returns:
-        - `Message | None`: Message indicating that the record has been
+        - `Message | None`: Message indicating that record has been
         deleted, or None if not found.
 
         """
@@ -306,7 +306,7 @@ class BaseView(Generic[Model]):
         **(Required)**
 
         :Returns:
-        - `None`: Indicates that the records have been deleted.
+        - `None`: Indicates that records have been deleted.
 
         """
         records: Sequence[Model] = self.read_multiple_by_ids(

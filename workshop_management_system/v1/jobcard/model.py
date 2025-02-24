@@ -29,9 +29,9 @@ class JobCardBase(SQLModel):
     - This class contains base model for job card table.
 
     :Attributes:
-    - `status (ServiceStatus)`: Status of the job card.
+    - `status (ServiceStatus)`: Status of job card.
     - `service_date (date)`: Date of service.
-    - `description (str)`: Description of the job card.
+    - `description (str)`: Description of job card.
     - `vehicle_id (int)`: Unique identifier for vehicle.
 
     """
@@ -53,9 +53,9 @@ class JobCard(Base, JobCardBase, table=True):
 
     :Attributes:
     - `id (int)`: Unique identifier for job card.
-    - `status (ServiceStatus)`: Status of the job card.
+    - `status (ServiceStatus)`: Status of job card.
     - `service_date (date)`: Date of service.
-    - `description (str)`: Description of the job card.
+    - `description (str)`: Description of job card.
     - `vehicle_id (int)`: Unique identifier for vehicle.
     - `created_at (datetime)`: Timestamp when job card was created.
     - `updated_at (datetime)`: Timestamp when job card was last updated.

@@ -18,8 +18,8 @@ class VehicleBase(SQLModel):
     - This class contains base model for vehicle table.
 
     :Attributes:
-    - `make (str)`: Make of the vehicle.
-    - `model (str)`: Model of the vehicle.
+    - `make (str)`: Make of vehicle.
+    - `model (str)`: Model of vehicle.
     - `year (int)`: Year of manufacture.
     - `vehicle_number (str)`: Vehicle Identification Number.
     - `customer_id (int)`: Unique identifier for customer.
@@ -41,8 +41,8 @@ class Vehicle(Base, VehicleBase, table=True):
 
     :Attributes:
     - `id (int)`: Unique identifier for vehicle.
-    - `make (str)`: Make of the vehicle.
-    - `model (str)`: Model of the vehicle.
+    - `make (str)`: Make of vehicle.
+    - `model (str)`: Model of vehicle.
     - `year (int)`: Year of manufacture.
     - `vehicle_number (str)`: Vehicle Identification Number.
     - `customer_id (int)`: Unique identifier for customer.
