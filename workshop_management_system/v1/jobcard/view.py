@@ -112,6 +112,12 @@ class JobCardView(BaseView[JobCard]):
             required_quantity: int = getattr(inventory, "_service_quantity", 1)
             db_inventory: Inventory | None = inventory_map.get(inventory.id)
 
+            if required_quantity < 1:
+                raise ValueError(
+                    f"Service quantity for {inventory.item_name} "
+                    f"must be at least 1"
+                )
+
             if db_inventory is None:
                 raise ValueError(f"Inventory with id {inventory.id} not found")
 

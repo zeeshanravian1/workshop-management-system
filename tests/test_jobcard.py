@@ -1022,7 +1022,7 @@ class TestJobCard(TestSetup):
             vehicle_id=self.test_vehicle_1.id,
         )
 
-        # Update inventory
+        # Update jobcard
         result: JobCard | None = self.jobcard_view.update_by_id(
             db_session=self.session,
             record_id=db_jobcard.id,
@@ -1088,7 +1088,7 @@ class TestJobCard(TestSetup):
         )
         self.test_inventory_1._service_quantity = 20
 
-        # Update inventory
+        # Update jobcard
         result: JobCard | None = self.jobcard_view.update_by_id(
             db_session=self.session,
             record_id=db_jobcard.id,
@@ -1155,7 +1155,7 @@ class TestJobCard(TestSetup):
         initial_quantity_2: int = self.test_inventory_2.quantity
         self.test_inventory_2._service_quantity = 20
 
-        # Update inventory
+        # Update jobcard
         result: JobCard | None = self.jobcard_view.update_by_id(
             db_session=self.session,
             record_id=db_jobcard.id,
@@ -1240,7 +1240,7 @@ class TestJobCard(TestSetup):
             vehicle_id=self.test_vehicle_1.id,
         )
 
-        # Update inventory
+        # Update jobcard
         result: JobCard | None = self.jobcard_view.update_by_id(
             db_session=self.session,
             record_id=db_jobcard.id,
@@ -1336,6 +1336,43 @@ class TestJobCard(TestSetup):
             exc_info.value
         )
 
+    def test_update_jobcard_inventory_quantity_negative(self) -> None:
+        """Updating a job card with negative inventory quantity."""
+        # Set inventory quantity
+        self.test_inventory_1._service_quantity = 10
+
+        # Create job card
+        db_jobcard: JobCard = self.jobcard_view.create(
+            db_session=self.session,
+            record=JobCard(
+                **self.test_jobcard_1.model_dump(),
+                inventories=[self.test_inventory_1],
+            ),
+        )
+
+        updated_jobcard: JobCardBase = JobCardBase(
+            status=ServiceStatus.IN_PROGRESS,
+            service_date=date.today() + timedelta(days=1),
+            description="Updated Test Job Card",
+            vehicle_id=self.test_vehicle_1.id,
+        )
+        self.test_inventory_1._service_quantity = -1
+
+        with pytest.raises(expected_exception=ValueError) as exc_info:
+            self.jobcard_view.update_by_id(
+                db_session=self.session,
+                record_id=db_jobcard.id,
+                record=JobCard(
+                    **updated_jobcard.model_dump(),
+                    inventories=[self.test_inventory_1],
+                ),
+            )
+
+        assert (
+            f"Service quantity for {self.test_inventory_1.item_name} "
+            "must be at least 1" in str(exc_info.value)
+        )
+
     def test_update_jobcard_multiple_inventories(self) -> None:
         """Updating a job card multiple inventory items."""
         # Set inventory quantity
@@ -1362,7 +1399,7 @@ class TestJobCard(TestSetup):
         self.test_inventory_1._service_quantity = 20
         self.test_inventory_2._service_quantity = 30
 
-        # Update inventory
+        # Update jobcard
         result: JobCard | None = self.jobcard_view.update_by_id(
             db_session=self.session,
             record_id=db_jobcard.id,
